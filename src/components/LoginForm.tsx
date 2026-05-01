@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Radio } from "lucide-react";
-import { signIn } from "@/lib/auth-client";
+import { supabase } from "@/lib/supabase";
 
 export function LoginForm() {
     const [isLoading, setIsLoading] = useState(false);
@@ -11,12 +11,14 @@ export function LoginForm() {
         setIsLoading(true);
 
         try {
-            await signIn.social({
+            const { error } = await supabase.auth.signInWithOAuth({
                 provider: "discord",
-                callbackURL: window.location.origin,
+                options: {
+                    redirectTo: window.location.origin,
+                },
             });
-            // The page will redirect to Discord, then back to the app
-            // onLogin will be called when the session is detected
+
+            if (error) throw error;
         } catch (err) {
             console.error("Login error:", err);
             setError("Error al iniciar sesión con Discord");

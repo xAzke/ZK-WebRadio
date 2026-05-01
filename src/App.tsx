@@ -22,7 +22,7 @@ import { CacheBrowser } from "@/components/CacheBrowser";
 import { Button } from "@/components/ui/button";
 import { ToastProvider, useToast, ConfirmDialog } from "@/components/ui/toast";
 import { AuthError } from "@/components/AuthError";
-import { useSession, signOut } from "@/lib/auth-client";
+import { supabase } from "@/lib/supabase";
 import {
     getStats,
     getTopTracks,
@@ -43,6 +43,7 @@ import {
     type RuntimeSettingsData,
 } from "@/services/api";
 import "./index.css";
+import { Session, User } from "@supabase/supabase-js";
 
 type Tab = "dashboard" | "apikeys" | "settings";
 
@@ -56,7 +57,8 @@ interface ConfirmState {
 }
 
 function AppContent() {
-    const { data: session, isPending } = useSession();
+    const [session, setSession] = useState<Session | null>(null);
+    const [isPending, setIsPending] = useState(true);
     const { addToast } = useToast();
     const [activeTab, setActiveTab] = useState<Tab>("dashboard");
     const [stats, setStats] = useState<Stats | null>(null);
@@ -79,7 +81,23 @@ function AppContent() {
         onConfirm: () => {},
     });
 
-    const isAuthenticated = !!session?.user;
+    useEffect(() => {
+        // Initial session check
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setIsPending(false);
+        });
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const user = session?.user;
+    const isAuthenticated = !!user;
 
     const closeConfirm = () =>
         setConfirmState((prev) => ({ ...prev, open: false }));
@@ -139,7 +157,7 @@ function AppContent() {
     }, [isAuthenticated, autoRefresh, fetchData]);
 
     const handleLogout = async () => {
-        await signOut();
+        await supabase.auth.signOut();
         setStats(null);
         setTracks([]);
         setApiKeys([]);
@@ -374,8 +392,8 @@ function AppContent() {
                                     Webradio Dashboard
                                 </h1>
                                 <p className="text-xs text-muted-foreground truncate">
-                                    {session?.user?.name ||
-                                        session?.user?.email ||
+                                    {user?.user_metadata?.full_name ||
+                                        user?.email ||
                                         "Usuario"}
                                 </p>
                             </div>
@@ -450,10 +468,10 @@ function AppContent() {
                             </button>
 
                             {/* User avatar — hidden on mobile */}
-                            {session?.user?.image && (
+                            {user?.user_metadata?.avatar_url && (
                                 <img
-                                    src={session.user.image}
-                                    alt={session.user.name || "Avatar"}
+                                    src={user.user_metadata.avatar_url}
+                                    alt={user.user_metadata.full_name || "Avatar"}
                                     className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border border-border"
                                 />
                             )}
@@ -745,13 +763,16 @@ function getAuthError(): {
     message?: string;
 } | null {
     const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const path = window.location.pathname;
 
-    if (path === "/auth-error" || params.has("error")) {
-        const errorType =
-            params.get("type") || params.get("error") || "generic";
+    const errorType = params.get("error") || hashParams.get("error");
+    const errorDescription = params.get("error_description") || hashParams.get("error_description");
 
-        // Map better-auth error codes to our types
+    if (path === "/auth-error" || errorType) {
+        const type = errorType || "generic";
+
+        // Map errors to our types
         const errorMap: Record<
             string,
             "unauthorized" | "state_mismatch" | "session_error" | "generic"
@@ -760,12 +781,13 @@ function getAuthError(): {
             state_mismatch: "state_mismatch",
             unable_to_create_session: "session_error",
             access_denied: "unauthorized",
+            not_allowed: "unauthorized",
             generic: "generic",
         };
 
         return {
-            type: errorMap[errorType] || "generic",
-            message: params.get("message") || undefined,
+            type: errorMap[type] || "generic",
+            message: errorDescription || undefined,
         };
     }
 

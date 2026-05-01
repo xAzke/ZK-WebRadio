@@ -1,52 +1,16 @@
+import { supabase } from "@/lib/supabase";
+
 const API_BASE = import.meta.env.VITE_API_URL || "/admin";
-const AUTH_BASE = import.meta.env.VITE_AUTH_URL || "http://localhost:3000";
 
-// Token storage
-let adminToken: string | null = null;
-let tokenExpiry: number = 0;
-let tokenFetchPromise: Promise<string | null> | null = null;
-
-// Get admin token from auth server
+// Get admin token from Supabase session
 export async function getAdminToken(): Promise<string | null> {
-    // Return cached token if still valid
-    if (adminToken && Date.now() < tokenExpiry) {
-        return adminToken;
-    }
-
-    // If already fetching, wait for that to complete
-    if (tokenFetchPromise) {
-        return tokenFetchPromise;
-    }
-
-    // Fetch new token
-    tokenFetchPromise = (async () => {
-        try {
-            const response = await fetch(`${AUTH_BASE}/api/admin-token`, {
-                credentials: "include",
-            });
-
-            if (!response.ok) {
-                return null;
-            }
-
-            const data = await response.json();
-            adminToken = data.token;
-            tokenExpiry = Date.now() + data.expiresIn * 1000 - 60000;
-            return adminToken;
-        } catch {
-            return null;
-        } finally {
-            tokenFetchPromise = null;
-        }
-    })();
-
-    return tokenFetchPromise;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
 }
 
-// Clear token on logout
+// Clear token on logout (handled by Supabase, but kept for compatibility)
 export function clearAdminToken() {
-    adminToken = null;
-    tokenExpiry = 0;
+    // Supabase handles this via signOut()
 }
 
 // Fetch with JWT Bearer token
