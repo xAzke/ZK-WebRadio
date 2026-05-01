@@ -1,0 +1,19 @@
+# Auth Server
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy server code
+COPY server ./server
+COPY tsconfig.json ./
+
+# Install tsx for running TypeScript
+RUN npm install -g tsx
+
+EXPOSE 3000
+
+CMD ["tsx", "server/index.ts"]
