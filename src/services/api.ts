@@ -27,10 +27,23 @@ async function fetchWithAuth(
         headers.set("Authorization", `Bearer ${token}`);
     }
 
-    return fetch(url, {
-        ...options,
-        headers,
-    });
+    console.log(`[API] Fetching: ${url}`); // Debugging
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            headers,
+        });
+
+        if (!response.ok) {
+            console.error(`[API] Error ${response.status}: ${response.statusText} at ${url}`);
+        }
+
+        return response;
+    } catch (err) {
+        console.error(`[API] Network error at ${url}:`, err);
+        throw err;
+    }
 }
 
 // Stats API

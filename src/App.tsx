@@ -43,7 +43,7 @@ import {
     type RuntimeSettingsData,
 } from "@/services/api";
 import "./index.css";
-import { Session, User } from "@supabase/supabase-js";
+import type { Session } from "@supabase/supabase-js";
 
 type Tab = "dashboard" | "apikeys" | "settings";
 
