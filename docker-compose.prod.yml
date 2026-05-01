@@ -1,0 +1,55 @@
+version: "3.8"
+
+# Production Docker Compose - Solo Webradio API
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+    # Webradio API (.NET)
+    webradio:
+        image: ${DOCKER_REGISTRY-}webradio
+        build:
+            context: .
+            dockerfile: webradio/Dockerfile
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - ASPNETCORE_URLS=http://+:5000
+        ports:
+            - "5000:5000"
+        volumes:
+            - deezer-cache:/tmp/deezer-cache
+            - ./data:/app/data
+        networks:
+            - webradio
+        restart: unless-stopped
+
+    # Deezer Service (requerido por webradio)
+    webradio-deezer-service:
+        image: ${DOCKER_REGISTRY-}deezerservice
+        build:
+            context: .
+            dockerfile: deezer-service/Dockerfile
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - ASPNETCORE_URLS=http://+:5002
+        volumes:
+            - deezer-cache:/tmp/deezer-cache
+        networks:
+            - webradio
+        restart: unless-stopped
+
+    # Redis (para cache)
+    redis:
+        image: redis:alpine
+        volumes:
+            - redis-data:/data
+        networks:
+            - webradio
+        restart: unless-stopped
+
+volumes:
+    redis-data:
+    deezer-cache:
+
+networks:
+    webradio:
+        driver: bridge
