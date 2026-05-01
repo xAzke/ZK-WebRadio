@@ -4,28 +4,28 @@
 [![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Hono](https://img.shields.io/badge/Hono-E36002?style=for-the-badge&logo=hono&logoColor=white)](https://hono.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
+[![Vercel](https://img.shields.io/badge/vercel-%23000000.svg?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
 
-A modern, high-performance administration dashboard for the ZK-WebRadio project. This dashboard provides real-time statistics, cache management, API key administration, and detailed analytics for the radio station's operations.
+A premium, high-performance administration dashboard for the ZK-WebRadio project. Designed with a professional "Control Room" aesthetic, this dashboard provides real-time analytics, cache management, and secure administrative controls.
 
 ## 🚀 Technology Stack
 
-- **Frontend Framework:** React 19 (Vite)
-- **Styling:** TailwindCSS 4, Shadcn/UI
-- **Backend/Auth Server:** Hono (Node Server)
-- **Authentication:** Better-Auth
-- **Database:** SQLite (Better-SQLite3)
+- **Frontend:** React 19 (Vite)
+- **Styling:** TailwindCSS 4 (Modern Hardware Aesthetic)
+- **Authentication:** Supabase Auth (Discord OAuth)
+- **Backend Integration:** Connects to a remote .NET API via JWT
 - **Data Visualization:** Recharts
 - **Icons:** Lucide-React
 - **Language:** TypeScript
 
 ## 🏗️ Project Architecture
 
-The project follows a modern full-stack architecture with a clear separation between the frontend dashboard and the authentication/admin backend.
+The project is a serverless-ready frontend application optimized for deployment on **Vercel**.
 
-- **Frontend (`/src`):** React SPA powered by Vite, utilizing a component-based architecture.
-- **Backend (`/server`):** Hono-based API server handling authentication and administrative tasks.
-- **Authentication:** Integrated `Better-Auth` for secure session management and user roles.
+- **Authentication:** Fully managed by **Supabase Auth**. No local session server is required.
+- **Security:** Implements a PostgreSQL-based Discord ID whitelist (via triggers) to restrict access.
+- **Communication:** Uses standard JWT Bearer tokens (ES256) to authorize requests to the central radio API.
 
 ## 📂 Project Structure
 
@@ -34,70 +34,63 @@ Dashboard/
 ├── src/                # Frontend React code
 │   ├── components/     # UI and Feature components
 │   │   ├── ui/         # Shadcn base components
-│   │   └── ...         # Feature-specific components (Stats, Tables, etc.)
-│   ├── lib/            # Utility functions and auth-client
-│   ├── services/       # API integration layer
-│   └── App.tsx         # Main application entry
-├── server/             # Backend Hono server
-│   ├── index.ts        # Server entry point
-│   └── auth.ts         # Authentication configuration
+│   │   └── ...         # Feature components (Stats, Tables, etc.)
+│   ├── lib/            # Supabase client and utilities
+│   ├── services/       # API integration layer (JWT handled automatically)
+│   └── App.tsx         # Main application entry and session management
 ├── public/             # Static assets
-└── Dockerfile          # Containerization setup
+├── supabase_whitelist.sql # Utility to setup Discord security in Supabase
+└── Dockerfile          # Optional containerization
 ```
 
 ## ✨ Key Features
 
-- **Real-time Statistics:** Interactive cards showing listeners, track stats, and server health.
-- **Analytics:** Visual charts for Top Tracks, Top IPs, and system failures using Recharts.
-- **Cache Management:** Tools to browse and manage the application's cache.
-- **API Key Management:** Complete system to generate, revoke, and track API keys.
-- **Secure Authentication:** Role-based access control with Better-Auth.
-- **Responsive Design:** Fully optimized for all screen sizes using TailwindCSS.
+- **Immersive Control Room UI:** High-end dark theme with glassmorphism and animated ambient effects.
+- **Real-time Stats:** Monitoring of uptime, listener searches, and stream metrics.
+- **Advanced Analytics:** Interactive charts for Top Tracks, Top IPs, and failure ratios.
+- **Cache Browser:** Visual tool to manage and preview cached audio assets.
+- **API Key Control:** Full management suite for third-party access keys.
+- **Secure Access:** Discord OAuth 2.0 integration with strict ID whitelisting.
 
 ## 🛠️ Getting Started
 
 ### Prerequisites
 
-- Node.js (Latest LTS recommended)
-- npm or pnpm
+- Node.js (Latest LTS)
+- A Supabase Project (with Discord Auth enabled)
 
-### Installation
+### Local Configuration
 
-1. Clone the repository:
+1. Clone and install:
    ```bash
    git clone https://github.com/xAzke/ZK-WebRadio.git
    cd ZK-WebRadio/Dashboard
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
    ```
 
-3. Set up environment variables:
-   Create a `.env` file based on the project requirements (see `.env.production` for reference).
-
-4. Run the development server:
-   ```bash
-   # Runs both frontend and backend
-   npm run dev:all
+2. Set up your `.env`:
+   ```env
+   VITE_API_URL=https://your-api.com/admin
+   VITE_SUPABASE_URL=https://your-id.supabase.co
+   VITE_SUPABASE_ANON_KEY=your-key
    ```
 
-## 📜 Development Workflow
+3. Run development server:
+   ```bash
+   npm run dev
+   ```
 
-- **Branching Strategy:** Main development happens on the `dashboard` branch.
-- **Code Standards:** ESLint and TypeScript are strictly enforced for code quality.
-- **Build Process:** Vite handles the frontend bundling, while `tsc` ensures type safety across the project.
+## 🔐 Security Setup
 
-## 🐳 Docker Deployment
+To enforce the Discord whitelist, execute the `supabase_whitelist.sql` script in your Supabase SQL Editor. This ensures only specific Discord IDs can enter the dashboard.
 
-The project includes a multi-stage Docker setup for production environments:
+## 🚀 Deployment
 
-```bash
-docker build -t zk-webradio-dashboard .
-docker run -p 80:80 zk-webradio-dashboard
-```
+This dashboard is optimized for **Vercel**:
+1. Connect this repository to Vercel.
+2. Add the environment variables from your `.env` to the Vercel project settings.
+3. Deploy!
 
 ## 📄 License
 
-This project is part of the ZK-WebRadio ecosystem. Reference the root repository for licensing details.
+Part of the ZK-WebRadio ecosystem. Reference the root repository for details.
