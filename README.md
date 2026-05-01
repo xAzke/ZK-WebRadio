@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# ZK-WebRadio Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+[![Vite](https://img.shields.io/badge/vite-%23646CFF.svg?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/)
+[![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Hono](https://img.shields.io/badge/Hono-E36002?style=for-the-badge&logo=hono&logoColor=white)](https://hono.dev/)
 
-Currently, two official plugins are available:
+A modern, high-performance administration dashboard for the ZK-WebRadio project. This dashboard provides real-time statistics, cache management, API key administration, and detailed analytics for the radio station's operations.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🚀 Technology Stack
 
-## React Compiler
+- **Frontend Framework:** React 19 (Vite)
+- **Styling:** TailwindCSS 4, Shadcn/UI
+- **Backend/Auth Server:** Hono (Node Server)
+- **Authentication:** Better-Auth
+- **Database:** SQLite (Better-SQLite3)
+- **Data Visualization:** Recharts
+- **Icons:** Lucide-React
+- **Language:** TypeScript
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🏗️ Project Architecture
 
-## Expanding the ESLint configuration
+The project follows a modern full-stack architecture with a clear separation between the frontend dashboard and the authentication/admin backend.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend (`/src`):** React SPA powered by Vite, utilizing a component-based architecture.
+- **Backend (`/server`):** Hono-based API server handling authentication and administrative tasks.
+- **Authentication:** Integrated `Better-Auth` for secure session management and user roles.
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 📂 Project Structure
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```text
+Dashboard/
+├── src/                # Frontend React code
+│   ├── components/     # UI and Feature components
+│   │   ├── ui/         # Shadcn base components
+│   │   └── ...         # Feature-specific components (Stats, Tables, etc.)
+│   ├── lib/            # Utility functions and auth-client
+│   ├── services/       # API integration layer
+│   └── App.tsx         # Main application entry
+├── server/             # Backend Hono server
+│   ├── index.ts        # Server entry point
+│   └── auth.ts         # Authentication configuration
+├── public/             # Static assets
+└── Dockerfile          # Containerization setup
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## ✨ Key Features
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **Real-time Statistics:** Interactive cards showing listeners, track stats, and server health.
+- **Analytics:** Visual charts for Top Tracks, Top IPs, and system failures using Recharts.
+- **Cache Management:** Tools to browse and manage the application's cache.
+- **API Key Management:** Complete system to generate, revoke, and track API keys.
+- **Secure Authentication:** Role-based access control with Better-Auth.
+- **Responsive Design:** Fully optimized for all screen sizes using TailwindCSS.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 🛠️ Getting Started
+
+### Prerequisites
+
+- Node.js (Latest LTS recommended)
+- npm or pnpm
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/xAzke/ZK-WebRadio.git
+   cd ZK-WebRadio/Dashboard
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file based on the project requirements (see `.env.production` for reference).
+
+4. Run the development server:
+   ```bash
+   # Runs both frontend and backend
+   npm run dev:all
+   ```
+
+## 📜 Development Workflow
+
+- **Branching Strategy:** Main development happens on the `dashboard` branch.
+- **Code Standards:** ESLint and TypeScript are strictly enforced for code quality.
+- **Build Process:** Vite handles the frontend bundling, while `tsc` ensures type safety across the project.
+
+## 🐳 Docker Deployment
+
+The project includes a multi-stage Docker setup for production environments:
+
+```bash
+docker build -t zk-webradio-dashboard .
+docker run -p 80:80 zk-webradio-dashboard
 ```
+
+## 📄 License
+
+This project is part of the ZK-WebRadio ecosystem. Reference the root repository for licensing details.
