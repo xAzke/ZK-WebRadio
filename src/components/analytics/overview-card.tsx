@@ -5,18 +5,14 @@ import { ChartContainer } from "@/components/ui/chart";
 import { TrendingUp, Users } from "lucide-react";
 import { Bar, BarChart, XAxis, YAxis } from "recharts";
 import {
-  deviceCategoryData,
-  usersPerDay,
   usersPerDayChartConfig,
 } from "./data";
 
 interface OverviewCardProps {
   totalRequests: number;
-  dailyStats?: { day: string, users: number }[];
-  hardwareStats?: { name: string, value: number, fill: string }[];
 }
 
-export function OverviewCard({ totalRequests, dailyStats = usersPerDay, hardwareStats = deviceCategoryData }: OverviewCardProps) {
+export function OverviewCard({ totalRequests }: OverviewCardProps) {
   const currentTotal = totalRequests.toLocaleString();
   
   // Create a single data point for the progress bar

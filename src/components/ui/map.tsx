@@ -1831,7 +1831,7 @@ type MapHeatmapLayerProps<
   /** GeoJSON FeatureCollection data or URL to fetch GeoJSON from */
   data: string | GeoJSON.FeatureCollection<GeoJSON.Point, P>;
   /** Weight property to use for the heatmap (optional) */
-  weightProperty?: keyof P;
+  weightProperty?: string;
   /** Maximum weight for a single point (default: 1) */
   maxWeight?: number;
   /** Heatmap intensity - increases as zoom increases (default: 1) */
