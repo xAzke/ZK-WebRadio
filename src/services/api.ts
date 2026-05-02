@@ -258,3 +258,44 @@ export async function regenerateApiKey(id: string): Promise<{ key: string }> {
     if (!response.ok) throw new Error("Failed to regenerate API key");
     return response.json();
 }
+
+// Geolocation service
+export interface GeoData {
+    status: string;
+    country: string;
+    countryCode: string;
+    region: string;
+    regionName: string;
+    city: string;
+    zip: string;
+    lat: number;
+    lon: number;
+    timezone: string;
+    isp: string;
+    org: string;
+    as: string;
+    query: string;
+}
+
+const geoCache: Record<string, GeoData> = {};
+
+export async function geolocateIP(ip: string): Promise<GeoData | null> {
+    if (geoCache[ip]) return geoCache[ip];
+    
+    // Skip private IPs
+    if (ip.startsWith("127.") || ip.startsWith("192.168.") || ip === "localhost") return null;
+
+    try {
+        const response = await fetch(`http://ip-api.com/json/${ip}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (data.status === "success") {
+            geoCache[ip] = data;
+            return data;
+        }
+        return null;
+    } catch (err) {
+        console.error(`[Geo] Failed to locate ${ip}:`, err);
+        return null;
+    }
+}

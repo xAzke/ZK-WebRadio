@@ -1,110 +1,61 @@
-import { ExternalLink, Music } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Radio } from "lucide-react";
 import type { Track } from "@/services/api";
+import { cn } from "@/lib/utils";
 
 interface TopTracksProps {
     tracks: Track[];
-    isLoading?: boolean;
+    isLoading: boolean;
 }
 
 export function TopTracks({ tracks, isLoading }: TopTracksProps) {
-    const openInDeezer = (track: Track) => {
-        const trackId = track.trackId.replace("deezer:", "");
-        window.open(`https://www.deezer.com/track/${trackId}`, "_blank");
-    };
+    return (
+        <div className="rounded-2xl border border-white/5 bg-[#121216]/95 p-6 shadow-sm relative overflow-hidden">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mb-6 flex items-center gap-2">
+                <Radio className="w-3 h-3 text-primary" />
+                Broadcast Leaders
+            </h3>
 
-    if (isLoading) {
-        return (
-            <div className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Music className="w-5 h-5" />
-                    Top Canciones
-                </h3>
+            {isLoading ? (
                 <div className="space-y-3">
                     {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="h-12 w-full bg-white/5 animate-pulse rounded-xl" />
+                    ))}
+                </div>
+            ) : tracks.length > 0 ? (
+                <div className="space-y-2">
+                    {tracks.map((track, i) => (
                         <div
                             key={i}
-                            className="flex items-center gap-4 animate-pulse"
+                            className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] hover:border-white/10 transition-all group/item"
                         >
-                            <div className="w-12 h-12 bg-secondary rounded-lg" />
-                            <div className="flex-1 space-y-2">
-                                <div className="h-4 bg-secondary rounded w-3/4" />
-                                <div className="h-3 bg-secondary rounded w-1/2" />
+                            <div className="flex items-center gap-4 min-w-0">
+                                <span className="text-[10px] font-mono font-bold text-white/10 group-hover/item:text-primary transition-colors w-4">
+                                    {(i + 1).toString().padStart(2, '0')}
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="font-semibold text-xs text-white/80 truncate group-hover/item:text-white transition-colors">
+                                        {track.title}
+                                    </p>
+                                    <p className="text-[10px] text-white/30 truncate uppercase font-medium tracking-tight">
+                                        {track.artist}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-4">
+                                <p className="text-sm font-mono font-bold text-primary">
+                                    {track.play_count}
+                                </p>
+                                <p className="text-[8px] font-bold uppercase tracking-tighter text-white/20">
+                                    PLYS
+                                </p>
                             </div>
                         </div>
                     ))}
                 </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="rounded-xl border border-border bg-card p-4 sm:p-6 shadow-sm">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
-                <Music className="w-5 h-5 text-primary" />
-                Top Canciones
-            </h3>
-
-            {tracks.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                    No hay canciones reproducidas aún
-                </p>
             ) : (
-                <div className="space-y-3">
-                    {tracks.map((track, index) => (
-                        <div
-                            key={track.trackId}
-                            onClick={() => openInDeezer(track)}
-                            className={cn(
-                                "flex items-center gap-4 p-3 rounded-lg transition-all cursor-pointer",
-                                "hover:bg-secondary/50 hover:scale-[1.02]",
-                            )}
-                        >
-                            <span className="text-lg font-bold text-muted-foreground w-6 text-center">
-                                {index + 1}
-                            </span>
-
-                            <div
-                                className={cn(
-                                    "w-12 h-12 rounded-lg flex items-center justify-center transition-all",
-                                    "bg-secondary",
-                                    "group-hover:bg-primary",
-                                )}
-                            >
-                                {track.albumCover ? (
-                                    <img
-                                        src={track.albumCover}
-                                        alt={track.title}
-                                        className="w-full h-full object-cover rounded-lg"
-                                    />
-                                ) : (
-                                    <ExternalLink className="w-5 h-5 text-muted-foreground" />
-                                )}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate text-foreground">
-                                    {track.title ||
-                                        `Track ${track.trackId.replace("deezer:", "")}`}
-                                    {(!track.title ||
-                                        track.title === "Unknown") &&
-                                        " 🔗"}
-                                </p>
-                                <p className="text-sm text-muted-foreground truncate">
-                                    {track.artist || "Artista desconocido"}
-                                </p>
-                            </div>
-
-                            <div className="text-right">
-                                <p className="font-semibold text-primary">
-                                    {track.playCount}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    plays
-                                </p>
-                            </div>
-                        </div>
-                    ))}
+                <div className="h-40 flex flex-col items-center justify-center opacity-20">
+                    <Radio className="w-8 h-8 mb-2" />
+                    <p className="text-[10px] font-bold uppercase tracking-widest">No Signal Detected</p>
                 </div>
             )}
         </div>
