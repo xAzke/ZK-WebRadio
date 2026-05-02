@@ -289,12 +289,30 @@ export async function geolocateIP(ip: string): Promise<GeoData | null> {
     if (normalizedIP.startsWith("127.") || normalizedIP.startsWith("192.168.") || normalizedIP === "localhost") return null;
 
     try {
-        const response = await fetch(`http://ip-api.com/json/${normalizedIP}`);
+        // Use ipwho.is which supports HTTPS for free
+        const response = await fetch(`https://ipwho.is/${normalizedIP}`);
         if (!response.ok) return null;
         const data = await response.json();
-        if (data.status === "success") {
-            geoCache[normalizedIP] = data;
-            return data;
+        
+        if (data.success) {
+            const mappedData: GeoData = {
+                status: "success",
+                country: data.country,
+                countryCode: data.country_code,
+                region: data.region_code,
+                regionName: data.region,
+                city: data.city,
+                zip: data.postal || "",
+                lat: data.latitude,
+                lon: data.longitude,
+                timezone: data.timezone?.id || "",
+                isp: data.connection?.isp || "",
+                org: data.connection?.org || "",
+                as: data.connection?.asn ? `AS${data.connection.asn}` : "",
+                query: data.ip
+            };
+            geoCache[normalizedIP] = mappedData;
+            return mappedData;
         }
         return null;
     } catch (err) {

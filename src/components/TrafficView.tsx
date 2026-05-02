@@ -186,7 +186,7 @@ export function TrafficView({ ips, isLoading }: TrafficViewProps) {
                 <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-all">
                   <div className="flex items-center gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary/40" />
-                    <span className="text-[10px] font-mono font-bold text-white/70">{item.name}</span>
+                    <span className="text-[10px] font-mono font-bold text-white/70">{item.name.replace(/^::ffff:/, "")}</span>
                   </div>
                   <div className="flex items-baseline gap-1">
                     <span className="text-xs font-bold text-primary">{item.requests}</span>
