@@ -1,6 +1,5 @@
 import { AlertTriangle } from "lucide-react";
 import type { FailureTrack } from "@/services/api";
-import { cn } from "@/lib/utils";
 
 interface TopFailuresProps {
     failures: FailureTrack[];
@@ -43,7 +42,7 @@ export function TopFailures({ failures, isLoading }: TopFailuresProps) {
                             </div>
                             <div className="text-right flex-shrink-0 ml-4 font-mono">
                                 <p className="text-sm font-bold text-red-400">
-                                    {track.fail_count}
+                                    {track.failureCount}
                                 </p>
                                 <p className="text-[8px] font-bold uppercase tracking-tighter text-white/20">
                                     FAILS

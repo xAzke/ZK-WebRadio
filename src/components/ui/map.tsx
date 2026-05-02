@@ -1189,10 +1189,9 @@ type MapArcEvent<T extends MapArcDatum = MapArcDatum> = {
   originalEvent: MapLibreGL.MapMouseEvent;
 };
 
-type MapArcLinePaint = NonNullable<MapLibreGL.LineLayerSpecification["paint"]>;
-type MapArcLineLayout = NonNullable<
-  MapLibreGL.LineLayerSpecification["layout"]
->;
+// Fixed: Using LayerSpecification and explicit casting for compatibility
+type MapArcLinePaint = NonNullable<MapLibreGL.LayerSpecification["paint"]>;
+type MapArcLineLayout = NonNullable<MapLibreGL.LayerSpecification["layout"]>;
 
 type MapArcProps<T extends MapArcDatum = MapArcDatum> = {
   /** Array of arcs to render. Each arc must have a unique `id`. */
@@ -1397,7 +1396,7 @@ function MapArc<T extends MapArcDatum = MapArcDatum>({
         source: sourceId,
         layout: mergedLayout,
         paint: mergedPaint,
-      },
+      } as MapLibreGL.LayerSpecification,
       beforeId,
     );
 
@@ -1428,14 +1427,14 @@ function MapArc<T extends MapArcDatum = MapArcDatum>({
     for (const [key, value] of Object.entries(mergedPaint)) {
       map.setPaintProperty(
         layerId,
-        key as keyof MapArcLinePaint,
+        String(key),
         value as never,
       );
     }
     for (const [key, value] of Object.entries(mergedLayout)) {
       map.setLayoutProperty(
         layerId,
-        key as keyof MapArcLineLayout,
+        String(key),
         value as never,
       );
     }

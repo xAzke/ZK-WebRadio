@@ -9,9 +9,7 @@ import {
     LogOut,
     Users,
     AlertTriangle,
-    Settings,
     Wrench,
-    Zap,
     LayoutDashboard,
     Key,
     Sliders,
@@ -240,7 +238,7 @@ function AppContent() {
     const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [autoRefresh, setAutoRefresh] = useState(false);
+    const [autoRefresh] = useState(false);
     const [cacheBrowserOpen, setCacheBrowserOpen] = useState(false);
     const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsData | null>(null);
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null);

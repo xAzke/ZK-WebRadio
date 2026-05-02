@@ -1,6 +1,5 @@
 import { MapPin } from "lucide-react";
 import type { Stats } from "@/services/api";
-import { cn } from "@/lib/utils";
 
 interface TopIPsProps {
     ips: Stats["topIPs"];
@@ -31,7 +30,7 @@ export function TopIPs({ ips, isLoading }: TopIPsProps) {
                             <div className="flex items-center gap-4 min-w-0">
                                 <div className="w-2 h-2 rounded-full bg-primary/40 group-hover/item:bg-primary transition-colors" />
                                 <span className="text-xs font-mono font-semibold text-white/80 group-hover/item:text-white transition-colors">
-                                    {item.ip}
+                                    {item.name}
                                 </span>
                             </div>
                             <div className="text-right flex-shrink-0 ml-4 font-mono">

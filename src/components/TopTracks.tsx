@@ -1,6 +1,5 @@
 import { Radio } from "lucide-react";
 import type { Track } from "@/services/api";
-import { cn } from "@/lib/utils";
 
 interface TopTracksProps {
     tracks: Track[];
@@ -43,7 +42,7 @@ export function TopTracks({ tracks, isLoading }: TopTracksProps) {
                             </div>
                             <div className="text-right flex-shrink-0 ml-4">
                                 <p className="text-sm font-mono font-bold text-primary">
-                                    {track.play_count}
+                                    {track.playCount}
                                 </p>
                                 <p className="text-[8px] font-bold uppercase tracking-tighter text-white/20">
                                     PLYS

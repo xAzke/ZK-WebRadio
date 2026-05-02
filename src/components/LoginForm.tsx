@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Radio, ShieldCheck, Zap, Waves, Lock, ArrowRight, Binary, Fingerprint } from "lucide-react";
+import { Radio, ShieldCheck, Lock, ArrowRight, Binary, Fingerprint } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { BlurFade } from "@/components/magicui/blur-fade";
 

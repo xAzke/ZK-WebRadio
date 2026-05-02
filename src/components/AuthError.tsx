@@ -1,5 +1,4 @@
-import { ShieldX, RefreshCw, Home, Radio, AlertCircle, Terminal, Binary, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShieldX, RefreshCw, AlertCircle, Terminal, Binary, ArrowLeft } from "lucide-react";
 import { BlurFade } from "@/components/magicui/blur-fade";
 import { cn } from "@/lib/utils";
 
