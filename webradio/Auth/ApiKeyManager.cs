@@ -144,7 +144,7 @@ public class ApiKeyManager
                 {
                     foreach (string ipAddress in config.AllowedIPAddresses)
                     {
-                        if (IPAddress.TryParse(ipAddress, out IPAddress address))
+                        if (IPAddress.TryParse(ipAddress, out IPAddress? address) && address != null)
                         {
                             addresses.Add(address);
                         }
@@ -195,13 +195,13 @@ public class ApiKeyManager
             _ = LoadFromDatabaseAsync();
     }
 
-    public ApiKey GetApiKeyFromServer(string serverAddress)
+    public ApiKey? GetApiKeyFromServer(string serverAddress)
     {
         fromServerAddress.TryGetValue(serverAddress, out var apiKey);
         return apiKey;
     }
 
-    public ApiKey GetApiKeyFromKey(string rawKey)
+    public ApiKey? GetApiKeyFromKey(string rawKey)
     {
         fromKey.TryGetValue(rawKey, out var apiKey);
         return apiKey;

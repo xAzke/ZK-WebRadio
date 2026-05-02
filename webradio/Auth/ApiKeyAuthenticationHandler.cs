@@ -58,7 +58,7 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        ApiKey apiKey = apiKeyManager.GetApiKeyFromKey(providedApiKey);
+        ApiKey? apiKey = apiKeyManager.GetApiKeyFromKey(providedApiKey);
 
         if (apiKey == null)
         {
@@ -67,9 +67,9 @@ public sealed class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAu
 
         if (apiKey.AllowedIPAddresses.Count > 0)
         {
-            IPAddress ipAddress = Request.HttpContext.Connection.RemoteIpAddress;
+            IPAddress? ipAddress = Request.HttpContext.Connection.RemoteIpAddress;
 
-            if (!apiKey.AllowedIPAddresses.Contains(ipAddress))
+            if (ipAddress == null || !apiKey.AllowedIPAddresses.Contains(ipAddress))
             {
                 return Task.FromResult(AuthenticateResult.Fail($"client ip address {ipAddress} is not allowed"));
             }

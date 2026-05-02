@@ -48,8 +48,8 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        IPAddress ipAddress = Request.HttpContext.Connection.RemoteIpAddress;
-        string userAgent = Request.Headers.UserAgent;
+        IPAddress? ipAddress = Request.HttpContext.Connection.RemoteIpAddress;
+        string? userAgent = Request.Headers.UserAgent;
         string path = $"{Request.Path}{Request.QueryString}";
 
         // Check runtime overrides first (for hot-toggle via admin API)
@@ -84,7 +84,7 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
         if (currentServerMatch.Success)
         {
             string serverAddress = currentServerMatch.Groups[1].Value;
-            ApiKey apiKey = apiKeyManager.GetApiKeyFromServer(serverAddress);
+            ApiKey? apiKey = apiKeyManager.GetApiKeyFromServer(serverAddress);
 
             if (apiKey != null)
             {

@@ -22,31 +22,36 @@ public class AdminAuthService : IAdminAuthService
     private readonly HttpClient _httpClient;
     private JsonWebKeySet? _jwks;
     private DateTime _nextRefresh = DateTime.MinValue;
+    private readonly object _lock = new();
 
-    public AdminAuthService(IConfiguration configuration)
+    public AdminAuthService(IConfiguration configuration, HttpClient httpClient)
     {
-        _supabaseUrl = configuration["SupabaseUrl"];
-        _httpClient = new HttpClient();
+        _supabaseUrl = configuration["SupabaseUrl"]
+            ?? throw new InvalidOperationException("SupabaseUrl no está configurado.");
+        _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromSeconds(15);
     }
 
     private void RefreshKeys()
     {
-        if (_jwks != null && DateTime.UtcNow < _nextRefresh) return;
+        lock (_lock)
+        {
+            if (_jwks != null && DateTime.UtcNow < _nextRefresh) return;
 
-        try
-        {
-            var url = $"{_supabaseUrl}/auth/v1/.well-known/jwks.json";
-            var response = _httpClient.GetAsync(url).GetAwaiter().GetResult();
-            response.EnsureSuccessStatusCode();
-            
-            var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            _jwks = new JsonWebKeySet(json);
-            _nextRefresh = DateTime.UtcNow.AddHours(1);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[AdminAuth] Error: {ex.Message}");
+            try
+            {
+                var url = $"{_supabaseUrl}/auth/v1/.well-known/jwks.json";
+                var response = _httpClient.GetAsync(url).GetAwaiter().GetResult();
+                response.EnsureSuccessStatusCode();
+                
+                var json = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                _jwks = new JsonWebKeySet(json);
+                _nextRefresh = DateTime.UtcNow.AddHours(1);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[AdminAuth] Error: {ex.Message}");
+            }
         }
     }
 

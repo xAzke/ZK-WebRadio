@@ -36,8 +36,9 @@ public sealed class Startup
         services.AddSingleton<ApiKeyManager>();
         services.AddSingleton<IStatsService, StatsService>();
         services.AddScoped<ITrackMetadataService, TrackMetadataService>();
+        
+        services.AddHttpClient<AdminAuthService>();
         services.AddSingleton<IAdminAuthService, AdminAuthService>();
-        services.AddHttpClient();
 
         services.AddAuthentication(options =>
         {
