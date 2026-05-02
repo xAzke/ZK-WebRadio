@@ -2,5 +2,5 @@
 
 public interface IServiceManager
 {
-    WebradioService GetService(string serviceName);
+    WebradioService? GetService(string serviceName);
 }

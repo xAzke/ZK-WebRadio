@@ -47,7 +47,7 @@ public class ServiceManager : IServiceManager
         }
     }
 
-    public WebradioService GetService(string serviceName)
+    public WebradioService? GetService(string serviceName)
     {
         services.TryGetValue(serviceName, out var client);
         return client;

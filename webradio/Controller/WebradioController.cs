@@ -106,11 +106,11 @@ public class WebradioController : ControllerBase
         }
 
         logger.LogInformation("{UserIdentity} @ {RemoteIpAddress} -> {Path}{Query}",
-            User.Identity.Name, HttpContext.Connection.RemoteIpAddress, Request.Path, Request.QueryString);
+            User.Identity?.Name, HttpContext.Connection.RemoteIpAddress, Request.Path, Request.QueryString);
 
         // Use the cache before contacting the requested service
         string cacheKey = GenerateCacheKey("search", serviceName, query);
-        string cacheValue = null;
+        string? cacheValue = null;
 
         try
         {
@@ -146,7 +146,7 @@ public class WebradioController : ControllerBase
         }
 
         // Use the respective service client to fetch data from a remote api or remote service
-        WebradioService service = services.GetService(serviceName);
+        WebradioService? service = services.GetService(serviceName);
 
         if (service == null)
         {
@@ -174,7 +174,7 @@ public class WebradioController : ControllerBase
         // Check the response from the service
         if (response.Status == null || response.Items == null || !response.Status.Success)
         {
-            return SearchFailure(response.Status?.ErrorMessage);
+            return SearchFailure(response.Status?.ErrorMessage ?? "Unknown error");
         }
 
         if (response.Items.Count > 0)
@@ -221,11 +221,11 @@ public class WebradioController : ControllerBase
         }
 
         logger.LogInformation("{RemoteIpAddress} @ {UserIdentity} -> {Path}{Query}",
-            HttpContext.Connection.RemoteIpAddress, User.Identity.Name, Request.Path, Request.QueryString);
+            HttpContext.Connection.RemoteIpAddress, User.Identity?.Name, Request.Path, Request.QueryString);
 
         // Use the cache before contacting the requested service
         string cacheKey = GenerateCacheKey("stream", serviceName, id);
-        string cacheValue = null;
+        string? cacheValue = null;
 
         try
         {
@@ -279,7 +279,7 @@ public class WebradioController : ControllerBase
         }
 
         // Use the respective service client to fetch data from a remote api or remote service
-        WebradioService service = services.GetService(serviceName);
+        WebradioService? service = services.GetService(serviceName);
 
         if (service == null)
         {
@@ -322,7 +322,7 @@ public class WebradioController : ControllerBase
                     {
                         try
                         {
-                            var meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
+                            SearchResponseItem? meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
                             if (meta != null)
                             {
                                 title = meta.Title;
@@ -388,7 +388,7 @@ public class WebradioController : ControllerBase
                 {
                     try
                     {
-                        var meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
+                        SearchResponseItem? meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
                         if (meta != null)
                         {
                             title = meta.Title;

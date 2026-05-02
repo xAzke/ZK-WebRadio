@@ -6,7 +6,7 @@ namespace Webradio.Auth;
 
 public sealed class ApiKey
 {
-    public ApiKey(string owner, string key, string serverAddress, IReadOnlyList<IPAddress> allowedIPAddresses = null)
+    public ApiKey(string owner, string key, string serverAddress, IReadOnlyList<IPAddress>? allowedIPAddresses = null)
     {
         Owner = owner ?? throw new ArgumentNullException(nameof(owner));
         Key = key ?? throw new ArgumentNullException(nameof(key));
