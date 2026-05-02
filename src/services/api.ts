@@ -280,22 +280,25 @@ export interface GeoData {
 const geoCache: Record<string, GeoData> = {};
 
 export async function geolocateIP(ip: string): Promise<GeoData | null> {
-    if (geoCache[ip]) return geoCache[ip];
+    // Normalize IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
+    const normalizedIP = ip.replace(/^::ffff:/, "");
+
+    if (geoCache[normalizedIP]) return geoCache[normalizedIP];
     
-    // Skip private IPs
-    if (ip.startsWith("127.") || ip.startsWith("192.168.") || ip === "localhost") return null;
+    // Skip private IPs using normalized value
+    if (normalizedIP.startsWith("127.") || normalizedIP.startsWith("192.168.") || normalizedIP === "localhost") return null;
 
     try {
-        const response = await fetch(`http://ip-api.com/json/${ip}`);
+        const response = await fetch(`http://ip-api.com/json/${normalizedIP}`);
         if (!response.ok) return null;
         const data = await response.json();
         if (data.status === "success") {
-            geoCache[ip] = data;
+            geoCache[normalizedIP] = data;
             return data;
         }
         return null;
     } catch (err) {
-        console.error(`[Geo] Failed to locate ${ip}:`, err);
+        console.error(`[Geo] Failed to locate ${normalizedIP}:`, err);
         return null;
     }
 }
