@@ -63,6 +63,7 @@ import {
     fixUnknownTracks,
     getSettings,
     updateSettings,
+    USE_MOCK,
     type Stats,
     type Track,
     type FailureTrack,
@@ -83,18 +84,25 @@ const Sidebar = memo(({
     activeTab, 
     setActiveTab, 
     user, 
-    handleLogout 
+    handleLogout,
+    isOpen,
+    setIsOpen
 }: { 
     activeTab: string, 
     setActiveTab: (t: Tab) => void, 
     user: any, 
-    handleLogout: () => void 
+    handleLogout: () => void,
+    isOpen?: boolean,
+    setIsOpen?: (o: boolean) => void
 }) => {
     const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0];
     const userAvatar = user?.user_metadata?.avatar_url;
 
     return (
-        <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-white/5 bg-[#0a0a0c] z-50 flex flex-col h-screen overflow-hidden shrink-0">
+        <aside className={cn(
+            "fixed inset-y-0 left-0 z-[100] w-64 border-r border-white/5 bg-[#0a0a0c] flex flex-col h-full md:h-screen overflow-hidden transition-transform duration-300 md:translate-x-0 md:static md:flex",
+            isOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
             <div className="p-6 space-y-8 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20">
@@ -119,7 +127,10 @@ const Sidebar = memo(({
                     ].map((tab) => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as Tab)}
+                            onClick={() => {
+                                setActiveTab(tab.id as Tab);
+                                if (window.innerWidth < 768 && setIsOpen) setIsOpen(false);
+                            }}
                             className={cn(
                                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all group",
                                 activeTab === tab.id
@@ -135,10 +146,10 @@ const Sidebar = memo(({
                 </nav>
             </div>
 
-            <div className="p-6 border-t border-white/5 bg-white/[0.01] flex-shrink-0">
+            <div className="p-6 pb-8 md:pb-6 border-t border-white/5 bg-white/[0.01] mt-auto flex-shrink-0">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="w-full flex items-center gap-3 p-2 rounded-2xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all text-left group">
+                        <button className="w-full flex items-center gap-3 p-2 rounded-2xl bg-white/[0.03] border border-white/5 md:hover:bg-white/[0.06] md:hover:border-white/10 active:bg-white/[0.1] transition-colors text-left group">
                             <div className="relative">
                                 <Avatar className="h-9 w-9 rounded-xl border border-white/10">
                                     <AvatarImage src={userAvatar} alt={userName} />
@@ -152,59 +163,58 @@ const Sidebar = memo(({
                                 <span className="truncate font-semibold uppercase text-[10px] text-white/90">{userName}</span>
                                 <span className="truncate text-[8px] font-medium text-white/30 uppercase tracking-tighter">Authorized Op</span>
                             </div>
-                            <ChevronsUpDown className="ml-auto size-3.5 text-white/20 group-hover:text-white/40 transition-colors" />
+                            <ChevronsUpDown className="ml-auto size-3.5 text-white/20 md:group-hover:text-white/40 transition-colors" />
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
-                        className="w-56 rounded-xl border-white/5 bg-[#0f0f12] text-white backdrop-blur-xl"
-                        side="right"
-                        align="end"
-                        sideOffset={8}
+                        className="w-60 md:w-56 rounded-xl border-white/5 bg-[#0f0f12] text-white z-[110] shadow-2xl"
+                        side={window.innerWidth < 768 ? "top" : "right"}
+                        align={window.innerWidth < 768 ? "center" : "end"}
+                        sideOffset={12}
                     >
                         <DropdownMenuLabel className="p-0 font-normal">
-                            <div className="flex items-center gap-2 px-2 py-2 text-left text-sm">
-                                <Avatar className="h-8 w-8 rounded-lg">
+                            <div className="flex items-center gap-3 px-3 py-3 md:px-2 md:py-2 text-left text-sm border-b border-white/5 md:border-none">
+                                <Avatar className="h-10 w-10 md:h-8 md:w-8 rounded-lg">
                                     <AvatarImage src={userAvatar} alt={userName} />
                                     <AvatarFallback className="rounded-lg bg-white/5 text-[10px] font-bold">
                                         {userName.substring(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="grid flex-1 text-left text-xs leading-tight">
-                                    <span className="truncate font-semibold text-white/90 uppercase text-[10px]">{userName}</span>
+                                    <span className="truncate font-semibold text-white/90 uppercase text-[10px] md:text-[10px]">{userName}</span>
                                     <span className="truncate text-[8px] text-white/30 uppercase font-mono tracking-tighter">
                                         ID: {user?.id.substring(0, 8)}
                                     </span>
                                 </div>
                             </div>
                         </DropdownMenuLabel>
-                        <DropdownMenuSeparator className="bg-white/5" />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem className="text-[10px] font-semibold uppercase tracking-widest focus:bg-primary/10 focus:text-primary transition-colors">
-                                <Sparkles className="size-3 text-primary" />
+                            <DropdownMenuItem className="py-3 md:py-1.5 text-[10px] font-semibold uppercase tracking-widest md:hover:bg-primary/10 md:hover:text-primary active:bg-primary/20 outline-none cursor-pointer">
+                                <Sparkles className="size-3.5 md:size-3 text-primary" />
                                 System Perks
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
-                        <DropdownMenuSeparator className="bg-white/5" />
+                        <DropdownMenuSeparator className="bg-white/5 hidden md:block" />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem className="text-[10px] font-semibold uppercase tracking-widest focus:bg-white/5 transition-colors">
-                                <BadgeCheck className="size-3 text-white/40" />
+                            <DropdownMenuItem className="py-3 md:py-1.5 text-[10px] font-semibold uppercase tracking-widest md:hover:bg-white/5 active:bg-white/10 outline-none cursor-pointer">
+                                <BadgeCheck className="size-3.5 md:size-3 text-white/40" />
                                 Profile
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-[10px] font-semibold uppercase tracking-widest focus:bg-white/5 transition-colors">
-                                <CreditCard className="size-3 text-white/40" />
+                            <DropdownMenuItem className="py-3 md:py-1.5 text-[10px] font-semibold uppercase tracking-widest md:hover:bg-white/5 active:bg-white/10 outline-none cursor-pointer">
+                                <CreditCard className="size-3.5 md:size-3 text-white/40" />
                                 Access Logs
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-[10px] font-semibold uppercase tracking-widest focus:bg-white/5 transition-colors">
-                                <Bell className="size-3 text-white/40" />
+                            <DropdownMenuItem className="py-3 md:py-1.5 text-[10px] font-semibold uppercase tracking-widest md:hover:bg-white/5 active:bg-white/10 outline-none cursor-pointer">
+                                <Bell className="size-3.5 md:size-3 text-white/40" />
                                 Alerts
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator className="bg-white/5" />
                         <DropdownMenuItem 
                             onClick={handleLogout}
-                            className="text-[10px] font-semibold uppercase tracking-widest focus:bg-red-500/10 focus:text-red-400 transition-colors text-red-400/80"
+                            className="py-3 md:py-1.5 text-[10px] font-semibold uppercase tracking-widest md:hover:bg-red-500/10 md:hover:text-red-400 active:bg-red-500/20 text-red-400/80 outline-none cursor-pointer"
                         >
-                            <LogOut className="size-3" />
+                            <LogOut className="size-3.5 md:size-3" />
                             Terminate Session
                         </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -227,6 +237,31 @@ interface ConfirmState {
     onConfirm: () => void;
 }
 
+// --- Utils ---
+
+function formatNumber(num: number | undefined) {
+    if (num === undefined) return "0";
+    return new Intl.NumberFormat().format(num);
+}
+
+function formatBytes(mb: number | undefined) {
+    if (mb === undefined || mb === 0) return "0 B";
+    const bytes = mb * 1024 * 1024;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
+    }
+    return `${size.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[unitIndex]}`;
+}
+
+function formatUptime(uptime: string) {
+    if (!uptime) return "0s";
+    return uptime;
+}
+
 function AppContent() {
     const [session, setSession] = useState<Session | null>(null);
     const [isPending, setIsPending] = useState(true);
@@ -242,6 +277,7 @@ function AppContent() {
     const [cacheBrowserOpen, setCacheBrowserOpen] = useState(false);
     const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsData | null>(null);
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [confirmState, setConfirmState] = useState<ConfirmState>({
         open: false, title: "", description: "", confirmText: "Confirmar", variant: "default", onConfirm: () => {},
     });
@@ -428,7 +464,22 @@ function AppContent() {
         <div className="h-screen w-screen bg-[#060608] text-white selection:bg-primary/30 overflow-hidden flex flex-col md:flex-row">
             <ConfirmDialog open={confirmState.open} title={confirmState.title} description={confirmState.description} confirmText={confirmState.confirmText} variant={confirmState.variant} onConfirm={confirmState.onConfirm} onCancel={closeConfirm} />
             
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} handleLogout={handleLogout} />
+            {/* Mobile Overlay */}
+            {isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
+            <Sidebar 
+                activeTab={activeTab} 
+                setActiveTab={setActiveTab} 
+                user={user} 
+                handleLogout={handleLogout}
+                isOpen={isSidebarOpen}
+                setIsOpen={setIsSidebarOpen}
+            />
 
             <main className="flex-1 h-screen overflow-hidden flex flex-col relative">
                 {/* Hardware-Accelerated Ambient Glows */}
@@ -437,20 +488,30 @@ function AppContent() {
                     <div className="absolute bottom-[-15%] right-[-15%] w-[50%] h-[50%] bg-[radial-gradient(circle,rgba(37,99,235,0.04)_0%,transparent_70%)] rounded-full" />
                 </div>
                 
-                <header className="flex-shrink-0 z-40 bg-[#060608]/95 px-6 py-4 border-b border-white/5 flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-white/20 uppercase tracking-widest mb-0.5">
-                            <span>System</span> <ChevronRight className="w-3 h-3" /> <span className="text-white/40">{activeTab}</span>
+                <header className="flex-shrink-0 z-40 bg-[#060608]/95 px-4 md:px-6 py-4 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="md:hidden w-10 h-10 rounded-xl bg-white/5 border-white/5"
+                        >
+                            <LayoutDashboard className="w-4 h-4" />
+                        </Button>
+                        <div>
+                            <div className="flex items-center gap-2 text-[10px] font-medium text-white/20 uppercase tracking-widest mb-0.5">
+                                <span className="hidden sm:inline">System</span> <ChevronRight className="w-3 h-3 hidden sm:inline" /> <span className="text-white/40">{activeTab}</span>
+                            </div>
+                            <h2 className="text-lg md:text-xl font-bold uppercase tracking-tight truncate max-w-[150px] sm:max-w-none">
+                                {activeTab === 'dashboard' ? 'Overview' : activeTab === 'traffic' ? 'Network' : activeTab === 'apikeys' ? 'API Control' : 'Settings'}
+                            </h2>
                         </div>
-                        <h2 className="text-xl font-bold uppercase tracking-tight">
-                            {activeTab === 'dashboard' ? 'Operational Overview' : activeTab === 'traffic' ? 'Network Intelligence' : activeTab === 'apikeys' ? 'Credential Management' : 'System Configuration'}
-                        </h2>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 md:gap-3">
                         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/5">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[10px] font-semibold uppercase tracking-tighter text-white/40">Status: Nominal</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-tighter text-white/40">Nominal</span>
                         </div>
                         <Button variant="outline" size="icon" onClick={() => fetchData()} disabled={isLoading || isRefreshing} className="w-10 h-10 rounded-xl bg-white/5 border-white/5 hover:bg-white/10">
                             <RefreshCw className={cn("w-4 h-4", (isLoading || isRefreshing) && "animate-spin")} />
@@ -460,69 +521,74 @@ function AppContent() {
 
                 {/* Layer-Promoted Scrollable Content */}
                 <div className="flex-1 overflow-y-auto no-scrollbar relative z-10 translate-z-0 will-change-scroll">
-                    <div className="p-6 max-w-[1600px] mx-auto">
+                    <div className="p-4 md:p-6 pb-24 md:pb-8 max-w-[1600px] mx-auto">
                         {activeTab === "dashboard" ? (
                             <div className="space-y-6">
                                 {/* Bento Grid Layout */}
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 items-stretch">
                                     {/* Stats Group */}
-                                    <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
-                                        <BlurFade delay={0.05} className="h-full">
+                                    <div className="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 items-stretch">
+                                        <BlurFade delay={0.05} className="flex">
                                             <MemoizedStatsCard 
                                                 title="Uptime" 
-                                                value={stats?.uptime || "0s"} 
-                                                subtitle="Current Session Active"
+                                                value={formatUptime(stats?.uptime || "0s")} 
                                                 icon={Clock} 
                                                 iconColor="text-emerald-400" 
-                                                className="h-full"
+                                                className="w-full"
+                                                variant="technical"
                                             />
                                         </BlurFade>
-                                        <BlurFade delay={0.1} className="h-full">
+                                        <BlurFade delay={0.1} className="flex">
                                             <MemoizedStatsCard 
                                                 title="Searches" 
-                                                value={stats?.requests.today.searches || 0} 
-                                                subtitle={`Total: ${stats?.requests.total.searches || 0}`} 
+                                                value={formatNumber(stats?.requests.today.searches)} 
+                                                subtitle={`Total: ${formatNumber(stats?.requests.total.searches)}`} 
                                                 icon={Search} 
                                                 iconColor="text-blue-400" 
-                                                className="h-full"
+                                                className="w-full"
                                             />
                                         </BlurFade>
-                                        <BlurFade delay={0.15} className="h-full">
+                                        <BlurFade delay={0.15} className="flex">
                                             <MemoizedStatsCard 
                                                 title="Streams" 
-                                                value={stats?.requests.today.streams || 0} 
-                                                subtitle={`Total: ${stats?.requests.total.streams || 0}`} 
+                                                value={formatNumber(stats?.requests.today.streams)} 
+                                                subtitle={`Total: ${formatNumber(stats?.requests.total.streams)}`} 
                                                 icon={Activity} 
                                                 iconColor="text-purple-400" 
-                                                className="h-full"
+                                                className="w-full"
                                             />
                                         </BlurFade>
                                     </div>
 
                                     {/* Cache Info */}
-                                    <div className="md:col-span-4">
-                                        <BlurFade delay={0.2} className="h-full">
+                                    <div className="md:col-span-4 flex">
+                                        <BlurFade delay={0.2} className="w-full flex">
                                             <MemoizedStatsCard 
                                                 title="Cache Storage" 
-                                                value={`${stats?.cache.files || 0} OBJ`} 
-                                                subtitle={`${stats?.cache.sizeMB || 0} MB Utilized`} 
+                                                value={formatBytes(stats?.cache.sizeMB)} 
+                                                subtitle={`${formatNumber(stats?.cache.files)} Objects Cached`} 
                                                 icon={HardDrive} 
                                                 iconColor="text-orange-400"
                                                 secondaryAction={{ label: "Manage", onClick: () => setCacheBrowserOpen(true) }}
-                                                className="h-full"
+                                                className="w-full"
                                             />
                                         </BlurFade>
                                     </div>
 
                                     {/* Main Data Section */}
-                                    <div className="md:col-span-8">
-                                        <BlurFade delay={0.25}><MemoizedTopTracks tracks={tracks} isLoading={isLoading} /></BlurFade>
+                                    <div className="md:col-span-8 space-y-4 md:space-y-6 flex flex-col">
+                                        <BlurFade delay={0.25} className="flex flex-col">
+                                            <MemoizedTopTracks tracks={tracks} isLoading={isLoading} />
+                                        </BlurFade>
+                                        <BlurFade delay={0.4} className="flex flex-col">
+                                            <MemoizedTopFailures failures={failures} isLoading={isLoading} />
+                                        </BlurFade>
                                     </div>
 
-                                    <div className="md:col-span-4 space-y-6 flex flex-col">
+                                    <div className="md:col-span-4 space-y-4 md:space-y-6 flex flex-col">
                                         {/* Top API Keys Card */}
-                                        <BlurFade delay={0.3} className="flex-1">
-                                            <div className="h-full relative overflow-hidden rounded-2xl border border-white/5 bg-[#121216]/95 p-6 flex flex-col">
+                                        <BlurFade delay={0.3} className="flex-1 flex">
+                                            <div className="w-full relative overflow-hidden rounded-2xl border border-white/5 bg-[#121216]/95 p-5 md:p-6 flex flex-col">
                                                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/20 mb-6 flex items-center gap-2">
                                                     <Users className="w-3 h-3 text-primary" /> Active Consumers
                                                 </h3>
@@ -534,7 +600,7 @@ function AppContent() {
                                                                 <span className="text-xs font-semibold text-white/70">{item.name}</span>
                                                             </div>
                                                             <div className="text-right">
-                                                                <span className="text-xs font-bold text-primary">{item.requests}</span>
+                                                                <span className="text-xs font-bold text-primary">{formatNumber(item.requests)}</span>
                                                                 <span className="text-[8px] font-medium text-white/10 ml-1">REQ</span>
                                                             </div>
                                                         </div>
@@ -549,7 +615,7 @@ function AppContent() {
                                             </div>
                                         </BlurFade>
 
-                                        <BlurFade delay={0.35}>
+                                        <BlurFade delay={0.35} className="flex">
                                             <MemoizedStatsCard 
                                                 title="Error Log" 
                                                 value={stats?.totalFailures || 0} 
@@ -557,13 +623,9 @@ function AppContent() {
                                                 icon={AlertTriangle} 
                                                 iconColor="text-red-400"
                                                 action={(stats?.totalFailures || 0) > 0 ? { label: "Purge Logs", onClick: handleResetFailures } : undefined}
+                                                className="w-full"
                                             />
                                         </BlurFade>
-                                    </div>
-
-                                    {/* Full Width Failures on Dashboard */}
-                                    <div className="md:col-span-12">
-                                        <BlurFade delay={0.4}><MemoizedTopFailures failures={failures} isLoading={isLoading} /></BlurFade>
                                     </div>
                                 </div>
                             </div>
@@ -663,13 +725,6 @@ function AppContent() {
                                         </div>
                                     </div>
                                 </BlurFade>
-                            </div>
-                        )}
-
-                        {lastUpdate && (
-                            <div className="mt-16 pb-8 flex flex-col items-center opacity-20">
-                                <div className="h-px w-32 bg-gradient-to-r from-transparent via-white to-transparent mb-4" />
-                                <p className="text-[8px] font-mono font-medium uppercase tracking-[0.5em]">Last Encryption Sync: {lastUpdate.toLocaleTimeString()}</p>
                             </div>
                         )}
                     </div>

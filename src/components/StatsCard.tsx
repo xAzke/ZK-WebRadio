@@ -11,6 +11,7 @@ interface StatsCardProps {
     action?: { label: string; onClick: () => void };
     secondaryAction?: { label: string; onClick: () => void };
     className?: string;
+    variant?: "default" | "technical";
 }
 
 export function StatsCard({
@@ -23,87 +24,67 @@ export function StatsCard({
     action,
     secondaryAction,
     className,
+    variant = "default",
 }: StatsCardProps) {
+    const isTechnical = variant === "technical";
+
     return (
         <div
             className={cn(
-                "group relative overflow-hidden rounded-2xl border border-white/5 bg-[#121216]/95 p-5 transition-all duration-300 hover:border-primary/30 hover:bg-[#16161c] shadow-[0_4px_20px_-10px_rgba(0,0,0,0.5)]",
+                "group relative overflow-hidden rounded-xl border border-white/5 bg-[#121216]/95 p-4 transition-all duration-300 hover:border-primary/20 hover:bg-[#16161c] flex flex-col justify-between min-h-[120px]",
                 className,
             )}
         >
-            {/* Background Glow Effect - Replaced expensive blur with radial gradient */}
-            <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.08)_0%,transparent_70%)] transition-transform duration-500 group-hover:scale-150" />
-            
-            {/* Corner Accent */}
-            <div className="absolute right-0 top-0 h-8 w-8 overflow-hidden">
-              <div className="absolute right-[-15px] top-[-15px] h-10 w-10 rotate-45 bg-white/5 transition-colors group-hover:bg-primary/20" />
-            </div>
-
             <div className="relative flex items-start justify-between">
-                <div className="space-y-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-white/30 group-hover:text-white/50 transition-colors">
+                <div className="space-y-1 min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-white/20 group-hover:text-white/40 transition-colors truncate">
                         {title}
                     </p>
-                    <div className="flex items-baseline gap-2">
-                        <p className="text-3xl font-mono font-bold tracking-tighter text-white/90 group-hover:text-white transition-colors">
-                            {value}
-                        </p>
-                    </div>
-                    
+                    <p className={cn(
+                        "font-mono font-bold tracking-tighter text-white/90 group-hover:text-white transition-all",
+                        isTechnical ? "text-2xl md:text-3xl" : "text-xl md:text-2xl"
+                    )}>
+                        {value}
+                    </p>
                     {subtitle && (
-                        <p className="text-xs font-medium text-white/40">
+                        <p className="text-[10px] font-medium text-white/30 truncate">
                             {subtitle}
                         </p>
                     )}
-
-                    {trend && (
-                        <div className="flex items-center pt-2">
-                            <span
-                                className={cn(
-                                    "text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded-sm uppercase tracking-tighter",
-                                    trend.value >= 0
-                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                        : "bg-red-500/10 text-red-400 border border-red-500/20",
-                                )}
-                            >
-                                {trend.value >= 0 ? "↑" : "↓"}
-                                {Math.abs(trend.value)}%
-                            </span>
-                        </div>
-                    )}
-
-                    <div className="flex gap-3 pt-3">
-                        {action && (
-                            <button
-                                onClick={action.onClick}
-                                className="text-[10px] font-semibold uppercase tracking-wider text-red-400/70 hover:text-red-400 transition-colors flex items-center gap-1 group/btn"
-                            >
-                                <span className="w-1 h-1 rounded-full bg-red-400/40 group-hover/btn:bg-red-400" />
-                                {action.label}
-                            </button>
-                        )}
-                        {secondaryAction && (
-                            <button
-                                onClick={secondaryAction.onClick}
-                                className="text-[10px] font-semibold uppercase tracking-wider text-primary/70 hover:text-primary transition-colors flex items-center gap-1 group/btn"
-                            >
-                                <span className="w-1 h-1 rounded-full bg-primary/40 group-hover/btn:bg-primary" />
-                                {secondaryAction.label}
-                            </button>
-                        )}
-                    </div>
                 </div>
 
                 <div className={cn(
-                    "relative flex h-12 w-12 items-center justify-center rounded-xl bg-white/5 border border-white/5 transition-all duration-500 group-hover:scale-105 group-hover:border-primary/20 group-hover:bg-primary/5",
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 border border-white/5 transition-all group-hover:border-primary/20 group-hover:bg-primary/5",
                     iconColor
                 )}>
-                    <Icon className="h-6 w-6" />
+                    <Icon className="h-4 w-4" />
                 </div>
             </div>
-            
-            {/* Bottom Tech Detail */}
-            <div className="absolute bottom-0 left-0 h-[1px] w-0 bg-gradient-to-r from-transparent via-primary/50 to-transparent transition-all duration-700 group-hover:w-full" />
+
+            <div className="relative mt-3 flex flex-wrap gap-2 pt-3 border-t border-white/[0.03]">
+                {action && (
+                    <button
+                        onClick={action.onClick}
+                        className="text-[9px] font-bold uppercase tracking-wider text-red-400/60 hover:text-red-400 transition-colors"
+                    >
+                        {action.label}
+                    </button>
+                )}
+                {secondaryAction && (
+                    <button
+                        onClick={secondaryAction.onClick}
+                        className="text-[9px] font-bold uppercase tracking-wider text-primary/60 hover:text-primary transition-colors"
+                    >
+                        {secondaryAction.label}
+                    </button>
+                )}
+                {!action && !secondaryAction && (
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-1 h-1 rounded-full bg-emerald-500/50" />
+                        <span className="text-[8px] font-bold text-white/10 uppercase tracking-widest">Active Relay</span>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

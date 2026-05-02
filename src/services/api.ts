@@ -1,6 +1,20 @@
 import { supabase } from "@/lib/supabase";
+import * as mock from "./mockData";
+
+// Re-export types from mockData to maintain API compatibility
+export type { 
+    Stats, 
+    CacheFile, 
+    RuntimeSettingsData, 
+    Track, 
+    FailureTrack, 
+    ApiKey, 
+    ApiKeyFull, 
+    GeoData 
+} from "./mockData";
 
 const API_BASE = import.meta.env.VITE_API_URL || "/admin";
+export const USE_MOCK = false; // Toggle this for design/testing
 
 // Get admin token from Supabase session
 export async function getAdminToken(): Promise<string | null> {
@@ -47,34 +61,15 @@ async function fetchWithAuth(
 }
 
 // Stats API
-export interface Stats {
-    uptime: string;
-    uptimeSeconds: number;
-    cache: {
-        files: number;
-        sizeBytes: number;
-        sizeMB: number;
-    };
-    requests: {
-        today: { searches: number; streams: number };
-        total: { searches: number; streams: number };
-    };
-    topApiKeys: { name: string; requests: number }[];
-    topIPs: { name: string; requests: number }[];
-    topUserAgents: { name: string; requests: number }[];
-    topTracks: { name: string; requests: number }[];
-    totalFailures: number;
-    failureRatio: number;
-    timestamp: string;
-}
-
-export async function getStats(): Promise<Stats> {
+export async function getStats(): Promise<mock.Stats> {
+    if (USE_MOCK) return mock.MOCK_STATS;
     const response = await fetchWithAuth(`${API_BASE}/stats`);
     if (!response.ok) throw new Error("Failed to fetch stats");
     return response.json();
 }
 
 export async function resetFailures(): Promise<void> {
+    if (USE_MOCK) return;
     const response = await fetchWithAuth(`${API_BASE}/stats/failures`, {
         method: "DELETE",
     });
@@ -86,6 +81,7 @@ export async function fixUnknownTracks(): Promise<{
     fixed_count: number;
     total: number;
 }> {
+    if (USE_MOCK) return { message: "Mock fix successful", fixed_count: 5, total: 10 };
     const response = await fetchWithAuth(`${API_BASE}/tracks/fix-unknown`, {
         method: "POST",
     });
@@ -94,16 +90,14 @@ export async function fixUnknownTracks(): Promise<{
 }
 
 // Cache API
-export interface CacheFile {
-    id: string;
-    title: string;
-    artist: string;
-    cover: string;
-    sizeMB: number;
-    lastAccessed: string;
-}
-
-export async function getCacheFiles(search?: string): Promise<CacheFile[]> {
+export async function getCacheFiles(search?: string): Promise<mock.CacheFile[]> {
+    if (USE_MOCK) {
+        if (!search) return mock.MOCK_CACHE_FILES;
+        return mock.MOCK_CACHE_FILES.filter(f => 
+            f.title.toLowerCase().includes(search.toLowerCase()) || 
+            f.artist.toLowerCase().includes(search.toLowerCase())
+        );
+    }
     const params = search ? `?search=${encodeURIComponent(search)}` : "";
     const response = await fetchWithAuth(`${API_BASE}/cache/files${params}`);
     if (!response.ok) throw new Error("Failed to fetch cache files");
@@ -112,6 +106,7 @@ export async function getCacheFiles(search?: string): Promise<CacheFile[]> {
 }
 
 export async function getCachePlayUrl(trackId: string): Promise<string> {
+    if (USE_MOCK) return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3";
     const response = await fetchWithAuth(`${API_BASE}/cache/play/${trackId}`);
     if (!response.ok) throw new Error("Failed to fetch audio");
     const blob = await response.blob();
@@ -119,21 +114,17 @@ export async function getCachePlayUrl(trackId: string): Promise<string> {
 }
 
 // Runtime Settings API
-export interface RuntimeSettingsData {
-    useApiKeyAuthentication: boolean | null;
-    useUserAgentAuthentication: boolean | null;
-    logUserAgent: boolean | null;
-}
-
-export async function getSettings(): Promise<RuntimeSettingsData> {
+export async function getSettings(): Promise<mock.RuntimeSettingsData> {
+    if (USE_MOCK) return mock.MOCK_SETTINGS;
     const response = await fetchWithAuth(`${API_BASE}/settings`);
     if (!response.ok) throw new Error("Failed to fetch settings");
     return response.json();
 }
 
 export async function updateSettings(
-    settings: Partial<RuntimeSettingsData>,
-): Promise<RuntimeSettingsData> {
+    settings: Partial<mock.RuntimeSettingsData>,
+): Promise<mock.RuntimeSettingsData> {
+    if (USE_MOCK) return { ...mock.MOCK_SETTINGS, ...settings };
     const response = await fetchWithAuth(`${API_BASE}/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -144,30 +135,8 @@ export async function updateSettings(
 }
 
 // Top Tracks API
-export interface Track {
-    trackId: string;
-    title: string;
-    artist: string;
-    albumCover?: string;
-    previewUrl?: string;
-    playCount: number;
-    failureCount: number;
-    lastPlayedAt?: string;
-}
-
-// Track failures API
-export interface FailureTrack {
-    trackId: string;
-    title: string;
-    artist: string;
-    albumCover?: string;
-    playCount: number;
-    failureCount: number;
-    failureRatio: number;
-    lastPlayedAt?: string;
-}
-
-export async function getTopTracks(limit = 10): Promise<Track[]> {
+export async function getTopTracks(limit = 10): Promise<mock.Track[]> {
+    if (USE_MOCK) return mock.MOCK_TRACKS.slice(0, limit);
     const response = await fetchWithAuth(
         `${API_BASE}/tracks/top?limit=${limit}`,
     );
@@ -175,7 +144,8 @@ export async function getTopTracks(limit = 10): Promise<Track[]> {
     return response.json();
 }
 
-export async function getTopFailures(limit = 10): Promise<FailureTrack[]> {
+export async function getTopFailures(limit = 10): Promise<mock.FailureTrack[]> {
+    if (USE_MOCK) return mock.MOCK_FAILURES.slice(0, limit);
     const response = await fetchWithAuth(
         `${API_BASE}/tracks/top-failures?limit=${limit}`,
     );
@@ -184,28 +154,19 @@ export async function getTopFailures(limit = 10): Promise<FailureTrack[]> {
 }
 
 // API Keys API
-export interface ApiKey {
-    id: string;
-    owner: string;
-    keyPreview: string;
-    serverAddress: string;
-    allowedIPAddresses: string;
-    isActive: boolean;
-    createdAt: string;
-    lastUsedAt?: string;
-}
-
-export interface ApiKeyFull extends Omit<ApiKey, "keyPreview"> {
-    key: string;
-}
-
-export async function getApiKeys(): Promise<ApiKey[]> {
+export async function getApiKeys(): Promise<mock.ApiKey[]> {
+    if (USE_MOCK) return mock.MOCK_API_KEYS;
     const response = await fetchWithAuth(`${API_BASE}/apikeys`);
     if (!response.ok) throw new Error("Failed to fetch API keys");
     return response.json();
 }
 
-export async function getApiKey(id: string): Promise<ApiKeyFull> {
+export async function getApiKey(id: string): Promise<mock.ApiKeyFull> {
+    if (USE_MOCK) {
+        const key = mock.MOCK_API_KEYS.find(k => k.id === id);
+        if (!key) throw new Error("Not found");
+        return { ...key, key: "zk_mock_full_key_12345678" };
+    }
     const response = await fetchWithAuth(`${API_BASE}/apikeys/${id}`);
     if (!response.ok) throw new Error("Failed to fetch API key");
     return response.json();
@@ -215,7 +176,18 @@ export async function createApiKey(data: {
     owner: string;
     serverAddress: string;
     allowedIPAddresses?: string;
-}): Promise<ApiKeyFull> {
+}): Promise<mock.ApiKeyFull> {
+    if (USE_MOCK) {
+        return {
+            id: Math.random().toString(36).substr(2, 9),
+            owner: data.owner,
+            serverAddress: data.serverAddress,
+            allowedIPAddresses: data.allowedIPAddresses || "*",
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            key: "zk_" + Math.random().toString(36).substr(2, 16)
+        };
+    }
     const response = await fetchWithAuth(`${API_BASE}/apikeys`, {
         method: "POST",
         body: JSON.stringify(data),
@@ -232,7 +204,12 @@ export async function updateApiKey(
         allowedIPAddresses?: string;
         isActive?: boolean;
     },
-): Promise<ApiKey> {
+): Promise<mock.ApiKey> {
+    if (USE_MOCK) {
+        const key = mock.MOCK_API_KEYS.find(k => k.id === id);
+        if (!key) throw new Error("Not found");
+        return { ...key, ...data };
+    }
     const response = await fetchWithAuth(`${API_BASE}/apikeys/${id}`, {
         method: "PUT",
         body: JSON.stringify(data),
@@ -242,6 +219,7 @@ export async function updateApiKey(
 }
 
 export async function deleteApiKey(id: string): Promise<void> {
+    if (USE_MOCK) return;
     const response = await fetchWithAuth(`${API_BASE}/apikeys/${id}`, {
         method: "DELETE",
     });
@@ -249,6 +227,7 @@ export async function deleteApiKey(id: string): Promise<void> {
 }
 
 export async function regenerateApiKey(id: string): Promise<{ key: string }> {
+    if (USE_MOCK) return { key: "zk_" + Math.random().toString(36).substr(2, 16) };
     const response = await fetchWithAuth(
         `${API_BASE}/apikeys/${id}/regenerate`,
         {
@@ -260,30 +239,13 @@ export async function regenerateApiKey(id: string): Promise<{ key: string }> {
 }
 
 // Geolocation service
-export interface GeoData {
-    status: string;
-    country: string;
-    countryCode: string;
-    region: string;
-    regionName: string;
-    city: string;
-    zip: string;
-    lat: number;
-    lon: number;
-    timezone: string;
-    isp: string;
-    org: string;
-    as: string;
-    query: string;
-    flag?: string;
-}
+const geoCache: Record<string, mock.GeoData> = {};
 
-const geoCache: Record<string, GeoData> = {};
-
-export async function geolocateIP(ip: string): Promise<GeoData | null> {
+export async function geolocateIP(ip: string): Promise<mock.GeoData | null> {
     // Normalize IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1 -> 127.0.0.1)
     const normalizedIP = ip.replace(/^::ffff:/, "");
 
+    if (USE_MOCK && mock.MOCK_GEO[normalizedIP]) return mock.MOCK_GEO[normalizedIP];
     if (geoCache[normalizedIP]) return geoCache[normalizedIP];
     
     // Skip private IPs using normalized value
@@ -300,7 +262,7 @@ export async function geolocateIP(ip: string): Promise<GeoData | null> {
         const data = await response.json();
         
         if (data.success) {
-            const mappedData: GeoData = {
+            const mappedData: mock.GeoData = {
                 status: "success",
                 country: data.country,
                 countryCode: data.country_code,
