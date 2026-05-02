@@ -1,7 +1,11 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { type BreakdownRow } from "./data";
+export interface BreakdownRow {
+  label: string;
+  value: number;
+  icon?: string;
+}
 
 interface BreakdownCardProps {
   title: string;
@@ -27,7 +31,16 @@ export function BreakdownCard({ title, rows }: BreakdownCardProps) {
           {rows.map((row) => (
             <div key={row.label} className="space-y-2">
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-white/60 font-medium truncate tracking-tight">{row.label}</span>
+                <div className="flex items-center gap-2 truncate">
+                  {row.icon && (
+                    <img 
+                      src={row.icon} 
+                      alt="" 
+                      className="w-4 h-3 object-cover rounded-[2px] border border-white/5 shrink-0" 
+                    />
+                  )}
+                  <span className="text-white/60 font-medium truncate tracking-tight">{row.label}</span>
+                </div>
                 <span className="text-primary font-mono font-bold tracking-tighter">{row.value}</span>
               </div>
               <div className="bg-white/5 h-1 rounded-full overflow-hidden">

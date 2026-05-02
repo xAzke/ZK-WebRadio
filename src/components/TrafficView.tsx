@@ -54,10 +54,10 @@ export function TrafficView({ ips, isLoading }: TrafficViewProps) {
     if (existing) {
       existing.value += loc.requests;
     } else {
-      acc.push({ label: loc.country, value: loc.requests });
+      acc.push({ label: loc.country, value: loc.requests, icon: loc.flag });
     }
     return acc;
-  }, [] as { label: string; value: number }[]).sort((a, b) => b.value - a.value);
+  }, [] as { label: string; value: number; icon?: string }[]).sort((a, b) => b.value - a.value);
 
   const cityBreakdown = locations.reduce((acc, loc) => {
     const existing = acc.find(r => r.label === loc.city);

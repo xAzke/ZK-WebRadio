@@ -275,6 +275,7 @@ export interface GeoData {
     org: string;
     as: string;
     query: string;
+    flag?: string;
 }
 
 const geoCache: Record<string, GeoData> = {};
@@ -313,7 +314,8 @@ export async function geolocateIP(ip: string): Promise<GeoData | null> {
                 isp: data.connection?.isp || "",
                 org: data.connection?.org || "",
                 as: data.connection?.asn ? `AS${data.connection.asn}` : "",
-                query: data.ip
+                query: data.ip,
+                flag: data.flag?.img
             };
             geoCache[normalizedIP] = mappedData;
             return mappedData;
