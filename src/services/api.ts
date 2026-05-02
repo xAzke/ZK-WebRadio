@@ -289,8 +289,8 @@ export async function geolocateIP(ip: string): Promise<GeoData | null> {
     if (normalizedIP.startsWith("127.") || normalizedIP.startsWith("192.168.") || normalizedIP === "localhost") return null;
 
     try {
-        // Use custom local API to avoid rate limits
-        const response = await fetch(`https://gpi.api.azke.tech/${normalizedIP}`, {
+        // Use custom local API to avoid rate limits (Corrected endpoint)
+        const response = await fetch(`https://gip.api.azke.tech/v1/lookup/${normalizedIP}`, {
             headers: {
                 "X-API-Key": import.meta.env.VITE_GEO_API_KEY || ""
             }
