@@ -63,7 +63,6 @@ import {
     fixUnknownTracks,
     getSettings,
     updateSettings,
-    USE_MOCK,
     type Stats,
     type Track,
     type FailureTrack,
@@ -276,7 +275,6 @@ function AppContent() {
     const [autoRefresh] = useState(false);
     const [cacheBrowserOpen, setCacheBrowserOpen] = useState(false);
     const [runtimeSettings, setRuntimeSettings] = useState<RuntimeSettingsData | null>(null);
-    const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [confirmState, setConfirmState] = useState<ConfirmState>({
         open: false, title: "", description: "", confirmText: "Confirmar", variant: "default", onConfirm: () => {},
@@ -311,7 +309,6 @@ function AppContent() {
                 setTracks(tracksData);
                 setFailures(failuresData);
                 setApiKeys(keysData);
-                setLastUpdate(new Date());
             } catch (error) {
                 console.error("Error fetching data:", error);
                 if (!background) {

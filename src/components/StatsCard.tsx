@@ -20,7 +20,6 @@ export function StatsCard({
     subtitle,
     icon: Icon,
     iconColor = "text-primary",
-    trend,
     action,
     secondaryAction,
     className,
