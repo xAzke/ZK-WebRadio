@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Map, MapControls, MapMarker, MarkerContent, MarkerTooltip } from "@/components/ui/map";
+import { useState, useEffect, useMemo } from "react";
+import { Map, MapControls, MapMarker, MarkerContent, MarkerTooltip, MapHeatmapLayer } from "@/components/ui/map";
 import { OverviewCard } from "@/components/analytics/overview-card";
 import { BreakdownCard } from "@/components/analytics/breakdown-card";
 import { BlurFade } from "@/components/magicui/blur-fade";
-import { Globe, Navigation, Loader2 } from "lucide-react";
+import { Globe, Navigation, Loader2, Flame } from "lucide-react";
 import { geolocateIP, type Stats, type GeoData } from "@/services/api";
+import { cn } from "@/lib/utils";
 
 interface TrafficViewProps {
   ips: Stats["topIPs"];
@@ -68,6 +69,16 @@ export function TrafficView({ ips, isLoading }: TrafficViewProps) {
     return acc;
   }, [] as { label: string; value: number }[]).sort((a, b) => b.value - a.value);
 
+  // Convert locations to GeoJSON for Heatmap visualization
+  const heatmapData = useMemo<GeoJSON.FeatureCollection<GeoJSON.Point>>(() => ({
+    type: "FeatureCollection",
+    features: locations.map(loc => ({
+      type: "Feature",
+      properties: { requests: loc.requests },
+      geometry: { type: "Point", coordinates: [loc.lon, loc.lat] }
+    }))
+  }), [locations]);
+
   return (
     <div className="space-y-6">
       {/* Map Section */}
@@ -81,17 +92,52 @@ export function TrafficView({ ips, isLoading }: TrafficViewProps) {
           >
             <MapControls position="bottom-right" showZoom showFullscreen />
             
+            {/* Heatmap Layer for density visualization */}
+            <MapHeatmapLayer 
+              data={heatmapData} 
+              weightProperty="requests" 
+              maxWeight={100}
+              radius={45}
+              intensity={2}
+            />
+
             {/* Markers for Real Dynamic Locations */}
             {locations.map((loc, i) => (
               <MapMarker key={i} longitude={loc.lon} latitude={loc.lat}>
                 <MarkerContent>
                   <div 
-                    className="relative flex items-center justify-center group"
-                    style={{ width: 12 + Math.min(loc.requests / 10, 20), height: 12 + Math.min(loc.requests / 10, 20) }}
+                    className="relative flex items-center justify-center group cursor-pointer"
+                    style={{ 
+                      width: 20 + Math.min(loc.requests / 5, 30), 
+                      height: 20 + Math.min(loc.requests / 5, 30) 
+                    }}
                   >
-                    <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping group-hover:bg-primary/40 transition-colors" />
-                    <div className="relative w-full h-full bg-primary/60 rounded-full border border-primary shadow-[0_0_10px_rgba(59,130,246,0.5)] flex items-center justify-center">
-                       <span className="text-[6px] font-bold text-white/80">{loc.requests}</span>
+                    {/* Animated Pulse Aura */}
+                    <div 
+                      className="absolute inset-0 bg-orange-500/20 rounded-full animate-ping group-hover:bg-orange-500/40 transition-colors" 
+                      style={{ animationDuration: `${Math.max(1, 3 - loc.requests / 50)}s` }}
+                    />
+                    
+                    {/* Flame Icon with Dynamic Scale and Glow */}
+                    <div className="relative transition-transform duration-300 group-hover:scale-125">
+                      <Flame 
+                        className={cn(
+                          "transition-all duration-500",
+                          loc.requests > 80 ? "text-orange-500" : "text-orange-400/80"
+                        )}
+                        style={{ 
+                          width: 16 + Math.min(loc.requests / 10, 20), 
+                          height: 16 + Math.min(loc.requests / 10, 20),
+                          filter: `drop-shadow(0 0 ${Math.min(loc.requests / 4, 15)}px rgba(249, 115, 22, 0.8))`
+                        }}
+                        fill={loc.requests > 50 ? "currentColor" : "none"}
+                        strokeWidth={2.5}
+                      />
+                      
+                      {/* Counter Badge */}
+                      <div className="absolute -top-1 -right-1 bg-black/80 border border-orange-500/50 rounded-full px-1 min-w-[14px] flex items-center justify-center shadow-lg">
+                        <span className="text-[7px] font-bold text-orange-400 font-mono">{loc.requests}</span>
+                      </div>
                     </div>
                   </div>
                 </MarkerContent>

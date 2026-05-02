@@ -1825,6 +1825,91 @@ function MapClusterLayer<
   return null;
 }
 
+type MapHeatmapLayerProps<
+  P extends GeoJSON.GeoJsonProperties = GeoJSON.GeoJsonProperties,
+> = {
+  /** GeoJSON FeatureCollection data or URL to fetch GeoJSON from */
+  data: string | GeoJSON.FeatureCollection<GeoJSON.Point, P>;
+  /** Weight property to use for the heatmap (optional) */
+  weightProperty?: keyof P;
+  /** Maximum weight for a single point (default: 1) */
+  maxWeight?: number;
+  /** Heatmap intensity - increases as zoom increases (default: 1) */
+  intensity?: number;
+  /** Colors for the heatmap as [stop, color] pairs (default: [0, "rgba(33,102,172,0)", 0.2, "rgb(103,169,207)", 0.4, "rgb(209,229,240)", 0.6, "rgb(253,219,199)", 0.8, "rgb(239,138,98)", 1, "rgb(178,24,43)"]) */
+  colorStops?: (number | string)[];
+  /** Maximum zoom level for the heatmap (default: 9) */
+  maxZoom?: number;
+  /** Radius of influence for each point in pixels (default: 30) */
+  radius?: number;
+};
+
+function MapHeatmapLayer<
+  P extends GeoJSON.GeoJsonProperties = GeoJSON.GeoJsonProperties,
+>({
+  data,
+  weightProperty,
+  maxWeight = 1,
+  intensity = 1,
+  colorStops = [
+    0, "rgba(59, 130, 246, 0)", 
+    0.2, "rgba(59, 130, 246, 0.2)", 
+    0.4, "rgba(59, 130, 246, 0.4)", 
+    0.6, "rgba(59, 130, 246, 0.6)", 
+    0.8, "rgba(59, 130, 246, 0.8)", 
+    1, "rgba(59, 130, 246, 1)"
+  ],
+  maxZoom = 9,
+  radius = 30,
+}: MapHeatmapLayerProps<P>) {
+  const { map, isLoaded } = useMap();
+  const id = useId();
+  const sourceId = `heatmap-source-${id}`;
+  const layerId = `heatmap-layer-${id}`;
+
+  useEffect(() => {
+    if (!isLoaded || !map) return;
+
+    map.addSource(sourceId, {
+      type: "geojson",
+      data,
+    });
+
+    map.addLayer({
+      id: layerId,
+      type: "heatmap",
+      source: sourceId,
+      maxzoom: maxZoom,
+      paint: {
+        "heatmap-weight": weightProperty 
+          ? ["interpolate", ["linear"], ["get", String(weightProperty)], 0, 0, maxWeight, 1]
+          : 1,
+        "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 0, intensity, maxZoom, 3 * intensity],
+        "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], ...colorStops] as any,
+        "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, radius / 2, maxZoom, radius],
+        "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], maxZoom - 1, 1, maxZoom, 0],
+      },
+    }, "waterway-label"); // Place below labels if possible
+
+    return () => {
+      try {
+        if (map.getLayer(layerId)) map.removeLayer(layerId);
+        if (map.getSource(sourceId)) map.removeSource(sourceId);
+      } catch {
+        // ignore
+      }
+    };
+  }, [isLoaded, map, sourceId]);
+
+  useEffect(() => {
+    if (!isLoaded || !map || typeof data === "string") return;
+    const source = map.getSource(sourceId) as MapLibreGL.GeoJSONSource;
+    if (source) source.setData(data);
+  }, [isLoaded, map, data, sourceId]);
+
+  return null;
+}
+
 export {
   Map,
   useMap,
@@ -1838,6 +1923,7 @@ export {
   MapRoute,
   MapArc,
   MapClusterLayer,
+  MapHeatmapLayer,
 };
 
 export type { MapRef, MapViewport, MapArcDatum, MapArcEvent };
