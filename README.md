@@ -6,90 +6,59 @@
 [![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 
-A high-fidelity, industrial-grade administrative interface for the ZK-WebRadio relay system. This dashboard combines a professional "Cyber-Industrial" aesthetic with real-time network intelligence, geolocated traffic analysis, and high-performance operations management.
+Una interfaz administrativa de alta fidelidad y grado industrial para el sistema de relay ZK-WebRadio. Este dashboard combina una estética "Cyber-Industrial" con inteligencia de red en tiempo real, análisis de tráfico geolocalizado y gestión de operaciones de alto rendimiento.
 
-## 🚀 Technology Stack
+## 🚀 Stack Tecnológico
 
 - **Frontend:** React 19 (Vite)
-- **Styling:** Tailwind CSS v4 (Cyber-Industrial Design System)
-- **Typography:** Geist Sans (UI) & JetBrains Mono (Technical Data)
-- **Authentication:** Supabase Auth (Discord OAuth integration)
-- **Maps:** MapLibre GL with @mapcn/map components
-- **Animations:** Framer Motion (Optimized BlurFade transitions)
-- **Data Visualization:** Recharts (Analytics & Trends)
-- **Icons:** Lucide React
+- **Estilos:** Tailwind CSS v4 (Sistema de diseño Cyber-Industrial)
+- **Tipografía:** Geist Sans (UI) y JetBrains Mono (Datos Técnicos)
+- **Autenticación:** Supabase Auth (Integración Discord OAuth)
+- **Mapas:** MapLibre GL con capas de calor (Heatmaps) personalizadas
+- **Animaciones:** Framer Motion (Transiciones BlurFade optimizadas)
+- **Visualización:** Recharts (Analíticas dinámicas y progreso de audiencia)
+- **Iconografía:** Lucide React (con iconos de estado "Flame" dinámicos)
 
-## 🏗️ Project Architecture
+## 🏗️ Arquitectura del Proyecto
 
-The dashboard is built on a modular "Bento Grid" architecture, optimized for administrative focus and operational speed.
+El dashboard utiliza una arquitectura modular de "Bento Grid", optimizada para la eficiencia operativa.
 
-- **Isolated Scrolling:** Fixed sidebar and main header with independent content scroll for a native-app feel.
-- **Service Layer:** Centralized API integration in `src/services/api.ts` with JWT handling and real-time state sync.
-- **Live Geolocation:** Real-time IP resolution using external geolocation APIs with intelligent in-memory caching.
-- **Performance Optimized:** GPU-accelerated layers and component memoization to ensure <1% CPU usage in idle states.
+- **Diseño Bento Grid:** Organización modular donde cada widget es autónomo y visualmente coherente.
+- **Gestión de Scroll Aislada:** Sidebar y cabecera estáticos con paneles de contenido que hacen scroll de forma independiente.
+- **Capa de Servicios:** Integración centralizada en `src/services/api.ts` con manejo automático de tokens JWT y normalización de IPs (IPv4/IPv6).
+- **Inteligencia de Red:** Geolocalización en tiempo real mediante API propia (`gip.api.azke.tech`) con caché persistente en memoria.
+- **Rendimiento:** Uso de aceleración por hardware (`translate-z-0`) y memoización de componentes para mantener un uso de CPU <1%.
 
-## ✨ Key Features
+## ✨ Funcionalidades Clave
 
-- **🌐 Network Intelligence:** Interactive global map with live IP geolocation and traffic volume markers.
-- **📊 Real-time Audience:** Dynamic metrics showing active consumers, hardware distribution, and ingress trends.
-- **🔑 API Control Console:** Professional credential management with inline editing and "terminal-style" security previews.
-- **🚨 Anomalies Monitoring:** Full-width tracking of critical system failures and metadata repair tools.
-- **📂 Cache Management:** Visual browser for exploring and managing distributed audio assets.
-- **🛡️ Secure Node Access:** Administrative terminal-style Login and AuthError screens for authorized operators only.
+- **🌐 Network Intelligence:** Mapa global interactivo con **Heatmaps** de densidad y marcadores **"Flame"** que escalan según el volumen de tráfico.
+- **📊 Audiencia Activa:** Monitorización en tiempo real con barras de progreso dinámicas en Recharts para audiencia y distribución de hardware.
+- **🗺️ Geolocalización Visual:** Identificación de países mediante banderas SVG integradas directamente desde la API de inteligencia de red.
+- **🔑 Control de API:** Consola de gestión de credenciales con previsualizaciones de seguridad y edición en línea.
+- **🚨 Monitor de Anomalías:** Seguimiento de fallos críticos del sistema con herramientas de reparación de metadatos integradas.
+- **📂 Navegador de Caché:** Explorador visual para gestionar y previsualizar activos de audio distribuidos.
 
-## 📂 Project Structure
+## 🛠️ Instalación y Configuración
 
-```text
-Dashboard/
-├── src/                
-│   ├── components/     
-│   │   ├── analytics/  # Recharts and breakdown components
-│   │   ├── magicui/    # Optimized animation primitives
-│   │   ├── ui/         # Base Shadcn/Radix components (Map, Chart, etc.)
-│   │   ├── TrafficView.tsx # Live Map & Intelligence Hub
-│   │   └── ...         # Feature components (ApiKeys, Stats, Tables)
-│   ├── lib/            # Shared utilities and Supabase client
-│   ├── services/       # API Layer (Geolocation & Dashboard sync)
-│   └── App.tsx         # Main layout orquestrator & Bento Grid
-├── public/             
-├── components.json     # UI configuration
-└── index.html          
-```
+### Requisitos Previos
+- Node.js (Última versión LTS)
+- Proyecto Supabase (Con Discord Auth habilitado)
+- API Key para el servicio de geolocalización de Azke Tech
 
-## 🛠️ Getting Started
+### Pasos de Configuración
+1. **Instalar dependencias:** `npm install`
+2. **Variables de Entorno:** Configurar `.env` con:
+   - `VITE_API_URL`: URL de tu API de administración.
+   - `VITE_GEO_API_KEY`: Tu clave para la API de geolocalización.
+   - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
+3. **Modo Desarrollo:** `npm run dev`
 
-### Prerequisites
+## 📝 Estándares de Desarrollo
 
-- Node.js (Latest LTS)
-- A Supabase Project (Discord Auth enabled)
+- **Tipografía:** `Geist Sans` para etiquetas de UI y `JetBrains Mono` estrictamente para datos cuantitativos, IPs y terminales.
+- **Colores:** Fondo base `#060608`, acentos en azul primario, verde esmeralda para estados nominales y rojo para anomalías.
+- **Surgical Updates:** Las actualizaciones deben ser quirúrgicas y mantener la integridad de tipos en TypeScript.
+- **Memoización:** Los widgets pesados deben estar envueltos en `React.memo` para soportar ciclos de refresco de 30s sin stuttering.
 
-### Local Configuration
-
-1. **Install Dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Environment Setup:**
-   Create a `.env` file in the root:
-   ```env
-   VITE_API_URL=https://your-api.com/admin
-   VITE_SUPABASE_URL=https://your-id.supabase.co
-   VITE_SUPABASE_ANON_KEY=your-key
-   ```
-
-3. **Development Mode:**
-   ```bash
-   npm run dev
-   ```
-
-## 📝 Development Standards
-
-- **Performance:** Avoid heavy canvas animations; use CSS radial gradients and hardware-accelerated layers.
-- **Typography:** Strictly use `Geist Sans` for UI labels and `JetBrains Mono` for all quantitative data.
-- **Colors:** Base background `#060608`, primary accents in high-contrast blue, emerald, and technical amber.
-- **Components:** Ensure all heavy widgets are wrapped in `React.memo` to handle the 30s auto-refresh cycles.
-
-## 📄 License
-
-Part of the ZK-WebRadio administrative ecosystem. Reference the main repository for comprehensive licensing information.
+---
+Parte del ecosistema administrativo de **ZK-WebRadio**.
