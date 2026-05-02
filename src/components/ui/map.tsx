@@ -1863,7 +1863,8 @@ function MapHeatmapLayer<
   radius = 30,
 }: MapHeatmapLayerProps<P>) {
   const { map, isLoaded } = useMap();
-  const id = useId();
+  const rawId = useId();
+  const id = rawId.replace(/:/g, "");
   const sourceId = `heatmap-source-${id}`;
   const layerId = `heatmap-layer-${id}`;
 
@@ -1874,6 +1875,8 @@ function MapHeatmapLayer<
       type: "geojson",
       data,
     });
+
+    const beforeId = map.getLayer("waterway-label") ? "waterway-label" : undefined;
 
     map.addLayer({
       id: layerId,
@@ -1889,7 +1892,7 @@ function MapHeatmapLayer<
         "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 0, radius / 2, maxZoom, radius],
         "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], maxZoom - 1, 1, maxZoom, 0],
       },
-    }, "waterway-label"); // Place below labels if possible
+    }, beforeId);
 
     return () => {
       try {
