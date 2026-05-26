@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace Webradio;
 
@@ -16,4 +16,5 @@ public sealed class ApplicationOptions
     public bool? UseApikeyAuthentication { get; set; }
     public bool? UseUserAgentAuthentication { get; set; }
     public bool? LogUserAgent { get; set; }
+    public string EncryptionKey { get; set; } = string.Empty;
 }
