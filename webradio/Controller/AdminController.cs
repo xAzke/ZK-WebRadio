@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 using Webradio.Auth;
 using Webradio.Data;
@@ -22,19 +23,24 @@ public class AdminController : ControllerBase
     private readonly IDbContextFactory<WebradioDbContext> _contextFactory;
     private readonly IAdminAuthService _adminAuth;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly string _cacheDirectory;
 
     public AdminController(
         IStatsService statsService, 
         IApiKeyStore apiKeyStore,
         IDbContextFactory<WebradioDbContext> contextFactory,
         IAdminAuthService adminAuth,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _statsService = statsService;
         _apiKeyStore = apiKeyStore;
         _contextFactory = contextFactory;
         _adminAuth = adminAuth;
         _httpClientFactory = httpClientFactory;
+        _cacheDirectory = configuration["CacheDirectory"] ?? (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+            ? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "deezer-cache")
+            : "/tmp/deezer-cache");
     }
 
     #region Stats Endpoints
@@ -232,7 +238,7 @@ public class AdminController : ControllerBase
             return Unauthorized();
         }
 
-        var cacheDir = "/tmp/deezer-cache";
+        var cacheDir = _cacheDirectory;
         if (!System.IO.Directory.Exists(cacheDir))
         {
             return Ok(new { files = Array.Empty<object>() });
@@ -295,7 +301,7 @@ public class AdminController : ControllerBase
 
         // Sanitize to prevent path traversal
         var sanitized = System.IO.Path.GetFileName(trackId);
-        var filePath = $"/tmp/deezer-cache/{sanitized}.mp3";
+        var filePath = System.IO.Path.Combine(_cacheDirectory, $"{sanitized}.mp3");
         
         if (!System.IO.File.Exists(filePath))
         {
