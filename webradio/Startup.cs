@@ -79,7 +79,7 @@ public sealed class Startup
         var redisConfig = configuration.GetValue<string>("Redis:Configuration");
         if (!string.IsNullOrEmpty(redisConfig))
         {
-            services.AddDistributedRedisCache(options =>
+            services.AddStackExchangeRedisCache(options =>
             {
                 options.Configuration = redisConfig;
                 options.InstanceName = "webradio";
