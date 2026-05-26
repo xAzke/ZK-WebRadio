@@ -14,10 +14,12 @@ message Configuration {
 
 message SearchRequest {
     string query = 1;
+    string arl = 2;
 }
 
 message StreamRequest {
     string id = 1;
+    string arl = 2;
 }
 
 service Webradio {

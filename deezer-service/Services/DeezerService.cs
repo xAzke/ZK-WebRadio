@@ -17,15 +17,17 @@ namespace DeezerService;
 
 public sealed class DeezerService : WebradioBase
 {
-    private readonly DeezerClient client;
+    private readonly DeezerClient _defaultClient;
+    private readonly ConcurrentDictionary<string, DeezerClient> _clients = new();
     private readonly ILogger<DeezerService> logger;
     private readonly string cacheDirectory;
     private readonly ConcurrentDictionary<long, DateTime> _failedTracks = new();
     private readonly ConcurrentDictionary<long, SemaphoreSlim> _downloadLocks = new();
     private readonly TimeSpan _failedTrackCacheDuration = TimeSpan.FromHours(6);
+
     public DeezerService(DeezerClient client, ILogger<DeezerService> logger, IConfiguration configuration)
     {
-        this.client = client;
+        this._defaultClient = client;
         this.logger = logger;
         
         // Create cache directory for downloaded tracks
@@ -36,6 +38,33 @@ public sealed class DeezerService : WebradioBase
         }
         
         logger.LogInformation("Deezer cache directory: {CacheDirectory}", cacheDirectory);
+    }
+
+    private async Task<DeezerClient> GetClientAsync(string requestArl)
+    {
+        if (string.IsNullOrWhiteSpace(requestArl))
+        {
+            return _defaultClient;
+        }
+
+        if (_clients.TryGetValue(requestArl, out var cachedClient))
+        {
+            return cachedClient;
+        }
+
+        var newClient = new DeezerClient();
+        try
+        {
+            await newClient.SetARL(requestArl);
+            _clients[requestArl] = newClient;
+            logger.LogInformation("Successfully initialized new dynamic DeezerClient for ARL");
+            return newClient;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to initialize dynamic DeezerClient with ARL");
+            throw new RpcException(new Status(StatusCode.Unauthenticated, "ARL token is invalid or expired"));
+        }
     }
 
     public override Task<Configuration> GetConfiguration(ConfigurationRequest request, ServerCallContext context)
@@ -56,7 +85,8 @@ public sealed class DeezerService : WebradioBase
 
         try
         {
-            var searchResult = await client.PublicApi.SearchTrack(request.Query, limit: 50);
+            var clientInstance = await GetClientAsync(request.Arl);
+            var searchResult = await clientInstance.PublicApi.SearchTrack(request.Query, limit: 50);
 
             if (searchResult == null || searchResult["data"] == null)
             {
@@ -128,13 +158,14 @@ public sealed class DeezerService : WebradioBase
                 // Try lower quality first (more likely to work with free accounts)
                 bool downloaded = false;
                 Bitrate[] bitratesToTry = { Bitrate.MP3_128, Bitrate.MP3_320 };
+                var clientInstance = await GetClientAsync(request.Arl);
                 
                 foreach (var bitrate in bitratesToTry)
                 {
                     try
                     {
                         logger.LogDebug("Trying bitrate {Bitrate}...", bitrate);
-                        await client.Downloader.WriteRawTrackToFile(
+                        await clientInstance.Downloader.WriteRawTrackToFile(
                             trackId, 
                             tempFilePath, 
                             bitrate

@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -29,6 +30,7 @@ public class WebradioController : ControllerBase
     private readonly IStatsService statsService;
     private readonly ITrackMetadataService trackMetadataService;
     private readonly IHttpClientFactory httpClientFactory;
+    private readonly IDeezerAccountStore deezerAccountStore;
 
     public WebradioController(
         ILogger<WebradioController> logger, 
@@ -36,7 +38,8 @@ public class WebradioController : ControllerBase
         IServiceManager services, 
         IStatsService statsService,
         ITrackMetadataService trackMetadataService,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IDeezerAccountStore deezerAccountStore)
     {
         this.logger = logger;
         this.cache = cache;
@@ -44,6 +47,7 @@ public class WebradioController : ControllerBase
         this.statsService = statsService;
         this.trackMetadataService = trackMetadataService;
         this.httpClientFactory = httpClientFactory;
+        this.deezerAccountStore = deezerAccountStore;
     }
 
     /// <summary>
@@ -94,374 +98,400 @@ public class WebradioController : ControllerBase
     [HttpGet("{serviceName}/search")]
     public async Task<ActionResult> Search([FromRoute] string serviceName, [FromQuery] string query)
     {
-        // Check if parameters fulfill our basic requirements
-        if (string.IsNullOrWhiteSpace(serviceName))
-        {
-            return NotFound();
-        }
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var requestId = Guid.NewGuid().ToString()[..8];
 
-        if (string.IsNullOrWhiteSpace(query))
+        using (logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["RequestId"] = requestId, ["Service"] = serviceName }))
         {
-            return NotFound();
-        }
+            // Check if parameters fulfill our basic requirements
+            if (string.IsNullOrWhiteSpace(serviceName) || string.IsNullOrWhiteSpace(query))
+            {
+                logger.LogWarning("Search: Invalid parameters received (Service: {Service}, Query: {Query})", serviceName, query);
+                return NotFound();
+            }
 
-        logger.LogInformation("{UserIdentity} @ {RemoteIpAddress} -> {Path}{Query}",
-            User.Identity?.Name, HttpContext.Connection.RemoteIpAddress, Request.Path, Request.QueryString);
+            logger.LogInformation("Search request started for query '{Query}' by {UserIdentity} from {RemoteIpAddress}",
+                query, User.Identity?.Name ?? "Anonymous", HttpContext.Connection.RemoteIpAddress);
 
-        // Use the cache before contacting the requested service
-        string cacheKey = GenerateCacheKey("search", serviceName, query);
-        string? cacheValue = null;
+            // Use the cache before contacting the requested service
+            string cacheKey = GenerateCacheKey("search", serviceName, query);
+            string? cacheValue = null;
 
-        try
-        {
-            using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(1));
-            cacheValue = await cache.GetStringAsync(cacheKey, cancellationTokenSource.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogError("Search: Cache took too long to respond (> 1 second) [key: {Key}]", cacheKey);
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "Search: Cache threw an exception for data lookup [key: {Key}]", cacheKey);
-        }
-
-        if (!string.IsNullOrWhiteSpace(cacheValue))
-        {
             try
             {
-                var items = JsonConvert.DeserializeObject<RepeatedField<SearchResponseItem>>(cacheValue);
+                using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(1));
+                cacheValue = await cache.GetStringAsync(cacheKey, cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogError("Search: Cache timeout (> 1s) for key {Key}", cacheKey);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Search: Cache error for key {Key}", cacheKey);
+            }
 
-                return new JsonResult(new
+            if (!string.IsNullOrWhiteSpace(cacheValue))
+            {
+                try
                 {
-                    success = true,
-                    items,
-                });
+                    var items = JsonConvert.DeserializeObject<RepeatedField<SearchResponseItem>>(cacheValue);
+                    sw.Stop();
+                    logger.LogInformation("Search: Cache HIT for '{Query}'. Found {Count} items. Elapsed: {Elapsed}ms", 
+                        query, items?.Count ?? 0, sw.ElapsedMilliseconds);
+
+                    return new JsonResult(new { success = true, items });
+                }
+                catch (JsonReaderException readerException)
+                {
+                    logger.LogError(readerException, "Search: Cache deserialization failed for {Service}", serviceName);
+                    RemoveCacheString(cacheKey);
+                }
             }
-            catch (JsonReaderException readerException)
+
+            logger.LogDebug("Search: Cache MISS for '{Query}'. Fetching from service...", query);
+
+            // Use the respective service client to fetch data from a remote api or remote service
+            WebradioService? service = services.GetService(serviceName);
+
+            if (service == null)
             {
-                logger.LogError(readerException, "{Service} threw an exception during cache deserialization", serviceName);
-                RemoveCacheString(cacheKey);
+                logger.LogWarning("Search: Unsupported service requested: {Service}", serviceName);
+                return SearchFailure("service is not supported");
             }
-        }
 
-        // Use the respective service client to fetch data from a remote api or remote service
-        WebradioService? service = services.GetService(serviceName);
+            SearchResponse response;
+            string arl = "";
+            DeezerAccountEntity? activeAccount = null;
 
-        if (service == null)
-        {
-            return SearchFailure("service is not supported");
-        }
-
-        SearchResponse response;
-
-        try
-        {
-            using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(SearchRequestTimeoutInSeconds));
-            response = await service.Client.SearchAsync(new SearchRequest { Query = query }, cancellationToken: cancellationTokenSource.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogError("Search: {Service} took too long to respond (> {Timeout} seconds)", serviceName, SearchRequestTimeoutInSeconds);
-            return SearchFailure($"service timeout reached after {SearchRequestTimeoutInSeconds} seconds");
-        }
-        catch (RpcException exception)
-        {
-            logger.LogError(exception, "{Service} threw an exception", serviceName);
-            return SearchFailure("service is out of order");
-        }
-
-        // Check the response from the service
-        if (response.Status == null || response.Items == null || !response.Status.Success)
-        {
-            return SearchFailure(response.Status?.ErrorMessage ?? "Unknown error");
-        }
-
-        if (response.Items.Count > 0)
-        {
-            SetCacheString(cacheKey, JsonConvert.SerializeObject(response.Items), service.Configuration.SearchExpirationInSeconds);
-            
-            // Cache individual track metadata for later use in stream
-            foreach (var item in response.Items)
+            if (serviceName.Equals("deezer", StringComparison.OrdinalIgnoreCase))
             {
-                string metaCacheKey = $"track_meta:{serviceName}:{item.Id}";
-                SetCacheString(metaCacheKey, JsonConvert.SerializeObject(item), 60 * 60 * 24); // 24 hours
+                try
+                {
+                    activeAccount = await deezerAccountStore.GetActiveAccountAsync();
+                    if (activeAccount != null)
+                    {
+                        arl = activeAccount.Arl;
+                        await deezerAccountStore.IncrementRequestCountAsync(activeAccount.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error fetching active Deezer account for search.");
+                }
             }
+
+            try
+            {
+                using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(SearchRequestTimeoutInSeconds));
+                response = await service.Client.SearchAsync(new SearchRequest { Query = query, Arl = arl }, cancellationToken: cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogError("Search: {Service} timeout reached (> {Timeout}s) for query '{Query}'", 
+                    serviceName, SearchRequestTimeoutInSeconds, query);
+                return SearchFailure($"service timeout reached after {SearchRequestTimeoutInSeconds} seconds");
+            }
+            catch (RpcException exception)
+            {
+                logger.LogError(exception, "Search: gRPC error from {Service} for query '{Query}'", serviceName, query);
+                
+                // If it fails with validation/auth exception, mark the account inactive
+                if (activeAccount != null && (exception.Status.Detail.Contains("ARL token is invalid") || exception.Status.Detail.Contains("expired")))
+                {
+                    logger.LogWarning("Deactivating invalid ARL during gRPC search exception for user: {Username}", activeAccount.Username);
+                    await deezerAccountStore.SetActiveStatusAsync(activeAccount.Id, false);
+                }
+                
+                return SearchFailure("service is out of order");
+            }
+
+            // Check the response from the service
+            if (response.Status == null || response.Items == null || !response.Status.Success)
+            {
+                var errorMsg = response.Status?.ErrorMessage ?? "Unknown error";
+                logger.LogWarning("Search: Service {Service} returned error: {Error}", serviceName, errorMsg);
+                
+                if (activeAccount != null && (errorMsg.Contains("ARL token is invalid") || errorMsg.Contains("expired")))
+                {
+                    logger.LogWarning("Deactivating invalid ARL during search response for user: {Username}", activeAccount.Username);
+                    await deezerAccountStore.SetActiveStatusAsync(activeAccount.Id, false);
+                }
+
+                return SearchFailure(errorMsg);
+            }
+
+            if (response.Items.Count > 0)
+            {
+                SetCacheString(cacheKey, JsonConvert.SerializeObject(response.Items), service.Configuration.SearchExpirationInSeconds);
+                
+                // Cache individual track metadata for later use in stream
+                foreach (var item in response.Items)
+                {
+                    string metaCacheKey = $"track_meta:{serviceName}:{item.Id}";
+                    SetCacheString(metaCacheKey, JsonConvert.SerializeObject(item), 60 * 60 * 24); // 24 hours
+                }
+            }
+
+            sw.Stop();
+            logger.LogInformation("Search: COMPLETED for '{Query}'. Found {Count} items. Provider: {Service}. Elapsed: {Elapsed}ms", 
+                query, response.Items.Count, serviceName, sw.ElapsedMilliseconds);
+
+            // Record stats
+            _ = statsService.RecordRequest(
+                User.Identity?.Name ?? "Anonymous",
+                HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                "search",
+                serviceName,
+                Request.Headers["User-Agent"].ToString()
+            );
+
+            return new JsonResult(new { success = true, items = response.Items });
         }
-
-        // Record stats
-        _ = statsService.RecordRequest(
-            User.Identity?.Name ?? "Anonymous",
-            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            "search",
-            serviceName,
-            Request.Headers["User-Agent"].ToString()
-        );
-
-        return new JsonResult(new
-        {
-            success = true,
-            items = response.Items,
-        });
     }
 
     [Authorize(AuthenticationSchemes = Auth.UserAgentAuthenticationOptions.DefaultScheme)]
     [HttpGet("{serviceName}/stream/{id}")]
     public async Task<ActionResult> Stream([FromRoute] string serviceName, [FromRoute] string id)
     {
-        // Check if parameters fulfill our basic requirements
-        if (string.IsNullOrWhiteSpace(serviceName))
-        {
-            return NotFound();
-        }
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var requestId = Guid.NewGuid().ToString()[..8];
 
-        if (string.IsNullOrWhiteSpace(id))
+        using (logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["RequestId"] = requestId, ["Service"] = serviceName, ["TrackId"] = id }))
         {
-            return NotFound();
-        }
-
-        logger.LogInformation("{RemoteIpAddress} @ {UserIdentity} -> {Path}{Query}",
-            HttpContext.Connection.RemoteIpAddress, User.Identity?.Name, Request.Path, Request.QueryString);
-
-        // Use the cache before contacting the requested service
-        string cacheKey = GenerateCacheKey("stream", serviceName, id);
-        string? cacheValue = null;
-
-        try
-        {
-            using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(1));
-            cacheValue = await cache.GetStringAsync(cacheKey, cancellationTokenSource.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogError("Stream: Cache took too long to respond (> 1 second) [key: {Key}]", cacheKey);
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "Stream: Cache threw an exception for data lookup [key: {Key}]", cacheKey);
-        }
-
-        if (!string.IsNullOrWhiteSpace(cacheValue))
-        {
-            // Handle cached file:// URLs - serve directly
-            if (cacheValue.StartsWith("file:///"))
+            // Check if parameters fulfill our basic requirements
+            if (string.IsNullOrWhiteSpace(serviceName) || string.IsNullOrWhiteSpace(id))
             {
-                string filePath = cacheValue.Replace("file:///", "");
-                // On Linux, add leading slash; on Windows, keep as-is
-                if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                    filePath = "/" + filePath;
-                
-                // Retry logic for files that might be briefly locked
-                for (int attempt = 0; attempt < 5; attempt++)
+                logger.LogWarning("Stream: Invalid parameters received (Service: {Service}, Id: {Id})", serviceName, id);
+                return NotFound();
+            }
+
+            logger.LogInformation("Stream request started for track {Id} by {UserIdentity} from {RemoteIpAddress}",
+                id, User.Identity?.Name ?? "Anonymous", HttpContext.Connection.RemoteIpAddress);
+
+            // Use the cache before contacting the requested service
+            string cacheKey = GenerateCacheKey("stream", serviceName, id);
+            string? cacheValue = null;
+
+            try
+            {
+                using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(1));
+                cacheValue = await cache.GetStringAsync(cacheKey, cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogError("Stream: Cache timeout (> 1s) for track {Id}", id);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "Stream: Cache error for track {Id}", id);
+            }
+
+            if (!string.IsNullOrWhiteSpace(cacheValue))
+            {
+                sw.Stop();
+                logger.LogInformation("Stream: Cache HIT for track {Id}. Elapsed: {Elapsed}ms", id, sw.ElapsedMilliseconds);
+
+                // Handle cached file:// URLs - serve directly
+                if (cacheValue.StartsWith("file:///"))
                 {
-                    if (System.IO.File.Exists(filePath))
+                    string filePath = cacheValue.Replace("file:///", "");
+                    // On Linux, add leading slash; on Windows, keep as-is
+                    if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                        filePath = "/" + filePath;
+                    
+                    // Retry logic for files that might be briefly locked
+                    for (int attempt = 0; attempt < 5; attempt++)
                     {
-                        try
+                        if (System.IO.File.Exists(filePath))
                         {
-                            var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
-                            return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
+                            try
+                            {
+                                var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
+                                return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
+                            }
+                            catch (System.IO.IOException) when (attempt < 4)
+                            {
+                                logger.LogDebug("Stream: File {Path} locked, retrying ({Attempt}/5)...", filePath, attempt + 1);
+                                System.Threading.Thread.Sleep(200);
+                            }
                         }
-                        catch (System.IO.IOException) when (attempt < 4)
+                        else if (attempt < 4)
                         {
                             System.Threading.Thread.Sleep(200);
                         }
                     }
-                    else if (attempt < 4)
-                    {
-                        System.Threading.Thread.Sleep(200);
-                    }
+                    logger.LogWarning("Stream: Cached file {Path} not found or locked after retries", filePath);
+                }
+                else
+                {
+                    return Redirect(cacheValue);
                 }
             }
-            else
+
+            logger.LogDebug("Stream: Cache MISS for track {Id}. Fetching from service...", id);
+
+            // Use the respective service client to fetch data from a remote api or remote service
+            WebradioService? service = services.GetService(serviceName);
+
+            if (service == null)
             {
-                return Redirect(cacheValue);
+                logger.LogWarning("Stream: Unsupported service requested: {Service}", serviceName);
+                return SearchFailure("service is not supported");
             }
-        }
+            
+            StreamResponse response;
+            string arl = "";
+            DeezerAccountEntity? activeAccount = null;
 
-        // Use the respective service client to fetch data from a remote api or remote service
-        WebradioService? service = services.GetService(serviceName);
+            if (serviceName.Equals("deezer", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    activeAccount = await deezerAccountStore.GetActiveAccountAsync();
+                    if (activeAccount != null)
+                    {
+                        arl = activeAccount.Arl;
+                        await deezerAccountStore.IncrementRequestCountAsync(activeAccount.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Error fetching active Deezer account for stream.");
+                }
+            }
 
-        if (service == null)
-        {
-            return SearchFailure("service is not supported");
-        }
-        
-        StreamResponse response;
+            try
+            {
+                using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(StreamRequestTimeoutInSeconds));
+                response = await service.Client.StreamAsync(new StreamRequest { Id = id, Arl = arl }, cancellationToken: cancellationTokenSource.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogError("Stream: {Service} timeout reached (> {Timeout}s) for track {Id}", 
+                    serviceName, StreamRequestTimeoutInSeconds, id);
+                return NotFound();
+            }
+            catch (RpcException exception)
+            {
+                logger.LogError(exception, "Stream: gRPC error from {Service} for track {Id}", serviceName, id);
+                
+                if (activeAccount != null && (exception.Status.Detail.Contains("ARL token is invalid") || exception.Status.Detail.Contains("expired")))
+                {
+                    logger.LogWarning("Deactivating invalid ARL during gRPC stream exception for user: {Username}", activeAccount.Username);
+                    await deezerAccountStore.SetActiveStatusAsync(activeAccount.Id, false);
+                }
 
-        try
-        {
-            using CancellationTokenSource cancellationTokenSource = new(TimeSpan.FromSeconds(StreamRequestTimeoutInSeconds));
-            response = await service.Client.StreamAsync(new StreamRequest { Id = id }, cancellationToken: cancellationTokenSource.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            logger.LogError("Stream: {Service} took too long to respond (> {Timeout} seconds)", serviceName, SearchRequestTimeoutInSeconds);
-            return NotFound();
-        }
-        catch (RpcException exception)
-        {
-            logger.LogError(exception, "Stream: {Service} threw an exception", serviceName);
-            return NotFound();
-        }
+                return NotFound();
+            }
 
-        // Check the response from the service
-        if (response.Status == null || !response.Status.Success || string.IsNullOrWhiteSpace(response.Url))
-        {
-            // Record failure
+            // Check the response from the service
+            if (response.Status == null || !response.Status.Success || string.IsNullOrWhiteSpace(response.Url))
+            {
+                var errorMsg = response.Status?.ErrorMessage ?? "Empty URL";
+                logger.LogWarning("Stream: Service {Service} failed to provide URL for {Id}. Error: {Error}", 
+                    serviceName, id, errorMsg);
+                
+                if (activeAccount != null && (errorMsg.Contains("ARL token is invalid") || errorMsg.Contains("expired")))
+                {
+                    logger.LogWarning("Deactivating invalid ARL during stream response for user: {Username}", activeAccount.Username);
+                    await deezerAccountStore.SetActiveStatusAsync(activeAccount.Id, false);
+                }
+                
+                // Record failure (background)
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        string metadataCacheKey = $"track_meta:{serviceName}:{id}";
+                        string? cachedMeta = await cache.GetStringAsync(metadataCacheKey);
+                        
+                        string title = "Unknown", artist = "Unknown";
+                        if (!string.IsNullOrEmpty(cachedMeta))
+                        {
+                            var meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
+                            title = meta?.Title ?? "Unknown";
+                            artist = meta?.Artist ?? "Unknown";
+                        }
+
+                        if (title == "Unknown")
+                        {
+                            var (apiTitle, apiArtist, _) = await FetchTrackMetadataAsync(serviceName, id);
+                            title = apiTitle; 
+                            artist = apiArtist;
+                        }
+
+                        await trackMetadataService.RecordFailureAsync($"{serviceName}:{id}", title, artist);
+                    }
+                    catch (Exception ex) { logger.LogWarning(ex, "Stream: Background failure recording failed for {Id}", id); }
+                });
+
+                return NotFound();
+            }
+
+            sw.Stop();
+            logger.LogInformation("Stream: COMPLETED for track {Id}. Type: {Type}. Elapsed: {Elapsed}ms", 
+                id, response.Url.StartsWith("file://") ? "Local" : "Remote", sw.ElapsedMilliseconds);
+
+            // Record stats & play (background)
+            _ = statsService.RecordRequest(User.Identity?.Name ?? "Anonymous", HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                "stream", serviceName, Request.Headers["User-Agent"].ToString(), id);
+
             _ = Task.Run(async () =>
             {
                 try
                 {
                     string metadataCacheKey = $"track_meta:{serviceName}:{id}";
                     string? cachedMeta = await cache.GetStringAsync(metadataCacheKey);
-                    
-                    string title = "Unknown";
-                    string artist = "Unknown";
+                    string title = "Unknown", artist = "Unknown", coverUrl = null;
 
                     if (!string.IsNullOrEmpty(cachedMeta))
                     {
-                        try
-                        {
-                            SearchResponseItem? meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
-                            if (meta != null)
-                            {
-                                title = meta.Title;
-                                artist = meta.Artist;
-                            }
-                        }
-                        catch { /* ignore */ }
+                        var meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
+                        title = meta?.Title ?? "Unknown";
+                        artist = meta?.Artist ?? "Unknown";
+                        coverUrl = meta?.CoverUrl;
                     }
 
-                    // Fallback: fetch from Deezer public API if still Unknown
-                    if (title == "Unknown" || artist == "Unknown")
+                    if (title == "Unknown")
                     {
-                        var (apiTitle, apiArtist, _) = await FetchTrackMetadataAsync(serviceName, id);
-                        title = apiTitle;
-                        artist = apiArtist;
+                        var (apiTitle, apiArtist, apiCover) = await FetchTrackMetadataAsync(serviceName, id);
+                        title = apiTitle; artist = apiArtist; coverUrl = apiCover;
                     }
 
-                    await trackMetadataService.RecordFailureAsync(
-                        trackId: $"{serviceName}:{id}",
-                        title: title,
-                        artist: artist
-                    );
+                    await trackMetadataService.RecordPlayAsync($"{serviceName}:{id}", title, artist, coverUrl, null);
                 }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to record track failure for {Id}", id);
-                }
+                catch (Exception ex) { logger.LogWarning(ex, "Stream: Background play recording failed for {Id}", id); }
             });
 
-            return NotFound();
-        }
-
-        // Record stats
-        _ = statsService.RecordRequest(
-            User.Identity?.Name ?? "Anonymous",
-            HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            "stream",
-            serviceName,
-            Request.Headers["User-Agent"].ToString(),
-            id
-        );
-
-        // Record track play - try to find metadata from search cache
-        _ = Task.Run(async () =>
-        {
-            try
+            SetCacheString(cacheKey, response.Url, service.Configuration.StreamExpirationInSeconds);
+            
+            if (response.Url.StartsWith("file:///"))
             {
-                // Try to find track metadata in cache (from previous search)
-                string metadataCacheKey = $"track_meta:{serviceName}:{id}";
-                string? cachedMeta = null;
+                string filePath = response.Url.Replace("file:///", "");
+                if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
+                    filePath = "/" + filePath;
                 
-                try
+                for (int attempt = 0; attempt < 10; attempt++)
                 {
-                    cachedMeta = await cache.GetStringAsync(metadataCacheKey);
-                }
-                catch { /* ignore cache errors */ }
-
-                string title = "Unknown";
-                string artist = "Unknown";
-                string? coverUrl = null;
-
-                if (!string.IsNullOrEmpty(cachedMeta))
-                {
-                    try
+                    if (System.IO.File.Exists(filePath))
                     {
-                        SearchResponseItem? meta = JsonConvert.DeserializeObject<SearchResponseItem>(cachedMeta);
-                        if (meta != null)
+                        try
                         {
-                            title = meta.Title;
-                            artist = meta.Artist;
-                            coverUrl = meta.CoverUrl;
+                            logger.LogDebug("Stream: Serving local file {Path} (Attempt {Attempt}/10)", filePath, attempt + 1);
+                            var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
+                            return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
                         }
+                        catch (System.IO.IOException) when (attempt < 9) { await Task.Delay(500); }
                     }
-                    catch { /* ignore parse errors */ }
+                    else if (attempt < 9) { await Task.Delay(500); }
                 }
-
-                // Fallback: fetch from Deezer public API if still Unknown
-                if (title == "Unknown" || artist == "Unknown")
-                {
-                    var (apiTitle, apiArtist, apiCover) = await FetchTrackMetadataAsync(serviceName, id);
-                    title = apiTitle;
-                    artist = apiArtist;
-                    coverUrl = apiCover ?? coverUrl;
-                }
-
-                await trackMetadataService.RecordPlayAsync(
-                    trackId: $"{serviceName}:{id}",
-                    title: title,
-                    artist: artist,
-                    albumCover: coverUrl,
-                    previewUrl: null
-                );
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to record track play for {Id}", id);
-            }
-        });
-
-        SetCacheString(cacheKey, response.Url, service.Configuration.StreamExpirationInSeconds);
-        
-        // Check if the URL is a local file path (file:///) - serve directly instead of redirect
-        if (response.Url.StartsWith("file:///"))
-        {
-            string filePath = response.Url.Replace("file:///", "");
-            // On Linux, add leading slash; on Windows, keep as-is
-            if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
-                filePath = "/" + filePath;
-            
-            // Retry logic for files that might be briefly locked
-            for (int attempt = 0; attempt < 10; attempt++)
-            {
-                if (System.IO.File.Exists(filePath))
-                {
-                    try
-                    {
-                        logger.LogInformation("Serving local file: {FilePath}", filePath);
-                        var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
-                        return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
-                    }
-                    catch (System.IO.IOException) when (attempt < 9)
-                    {
-                        // File might be locked by deezer-service writing it, wait and retry
-                        logger.LogDebug("File locked, retrying... (attempt {Attempt}/10)", attempt + 1);
-                        await Task.Delay(500);
-                    }
-                }
-                else if (attempt < 9)
-                {
-                    // File might be being written, wait and retry
-                    await Task.Delay(500);
-                }
+                logger.LogError("Stream: Local file not found/locked after 10 retries: {Path}", filePath);
+                return NotFound();
             }
             
-            logger.LogError("Local file not found or locked after 10 retries: {FilePath}", filePath);
-            return NotFound();
+            return Redirect(response.Url);
         }
-        
-        return Redirect(response.Url);
     }
 
     [NonAction]

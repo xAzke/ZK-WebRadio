@@ -20,6 +20,7 @@ public class AdminController : ControllerBase
 {
     private readonly IStatsService _statsService;
     private readonly IApiKeyStore _apiKeyStore;
+    private readonly IDeezerAccountStore _deezerAccountStore;
     private readonly IDbContextFactory<WebradioDbContext> _contextFactory;
     private readonly IAdminAuthService _adminAuth;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -28,6 +29,7 @@ public class AdminController : ControllerBase
     public AdminController(
         IStatsService statsService, 
         IApiKeyStore apiKeyStore,
+        IDeezerAccountStore deezerAccountStore,
         IDbContextFactory<WebradioDbContext> contextFactory,
         IAdminAuthService adminAuth,
         IHttpClientFactory httpClientFactory,
@@ -35,6 +37,7 @@ public class AdminController : ControllerBase
     {
         _statsService = statsService;
         _apiKeyStore = apiKeyStore;
+        _deezerAccountStore = deezerAccountStore;
         _contextFactory = contextFactory;
         _adminAuth = adminAuth;
         _httpClientFactory = httpClientFactory;
@@ -544,6 +547,257 @@ public class AdminController : ControllerBase
 
     #endregion
 
+    #region Deezer Accounts Endpoints
+
+    /// <summary>
+    /// List all Deezer accounts
+    /// </summary>
+    [HttpGet("deezer-accounts")]
+    public async Task<ActionResult> GetDeezerAccounts()
+    {
+        if (!IsAuthenticated())
+        {
+            return Unauthorized();
+        }
+
+        var accounts = await _deezerAccountStore.GetAllAsync();
+        
+        var result = accounts.Select(a => new
+        {
+            a.Id,
+            ArlPreview = a.Arl.Length > 8 ? a.Arl[..4] + "..." + a.Arl[^4..] : "...",
+            a.Username,
+            a.UserId,
+            a.AvatarUrl,
+            a.IsPremium,
+            a.IsActive,
+            a.CreatedAt,
+            a.LastUsedAt,
+            a.RequestCount
+        });
+
+        return new JsonResult(result);
+    }
+
+    /// <summary>
+    /// Register or update a Deezer account using its ARL token
+    /// </summary>
+    [HttpPost("deezer-accounts")]
+    public async Task<ActionResult> CreateDeezerAccount([FromBody] CreateDeezerAccountRequest request)
+    {
+        if (!IsAuthenticated())
+        {
+            return Unauthorized();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Arl))
+        {
+            return BadRequest(new { message = "ARL token is required" });
+        }
+
+        var (success, username, userId, avatarUrl, isPremium) = await GetDeezerUserInfoAsync(request.Arl);
+
+        if (!success)
+        {
+            return BadRequest(new { message = "ARL token is invalid or expired" });
+        }
+
+        var allAccounts = await _deezerAccountStore.GetAllAsync();
+        var existing = allAccounts.FirstOrDefault(a => a.UserId == userId);
+
+        if (existing != null)
+        {
+            existing.Arl = request.Arl;
+            existing.Username = username;
+            existing.AvatarUrl = avatarUrl;
+            existing.IsPremium = isPremium;
+            existing.IsActive = true;
+
+            var updated = await _deezerAccountStore.UpdateAsync(existing.Id, existing);
+            return Ok(new
+            {
+                id = updated?.Id,
+                username = updated?.Username,
+                userId = updated?.UserId,
+                avatarUrl = updated?.AvatarUrl,
+                isPremium = updated?.IsPremium,
+                isActive = updated?.IsActive,
+                createdAt = updated?.CreatedAt,
+                requestCount = updated?.RequestCount
+            });
+        }
+        else
+        {
+            var entity = new DeezerAccountEntity
+            {
+                Arl = request.Arl,
+                Username = username,
+                UserId = userId,
+                AvatarUrl = avatarUrl,
+                IsPremium = isPremium,
+                IsActive = true
+            };
+
+            var created = await _deezerAccountStore.CreateAsync(entity);
+            return Created($"/admin/deezer-accounts/{created.Id}", new
+            {
+                id = created.Id,
+                username = created.Username,
+                userId = created.UserId,
+                avatarUrl = created.AvatarUrl,
+                isPremium = created.IsPremium,
+                isActive = created.IsActive,
+                createdAt = created.CreatedAt,
+                requestCount = created.RequestCount
+            });
+        }
+    }
+
+    /// <summary>
+    /// Toggle dynamic state (active status) of a Deezer account
+    /// </summary>
+    [HttpPut("deezer-accounts/{id:guid}")]
+    public async Task<ActionResult> ToggleDeezerAccountActive(Guid id, [FromBody] UpdateDeezerAccountRequest request)
+    {
+        if (!IsAuthenticated())
+        {
+            return Unauthorized();
+        }
+
+        var existing = await _deezerAccountStore.GetByIdAsync(id);
+        if (existing == null)
+        {
+            return NotFound();
+        }
+
+        if (request.IsActive.HasValue)
+        {
+            await _deezerAccountStore.SetActiveStatusAsync(id, request.IsActive.Value);
+        }
+
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// Delete a Deezer account
+    /// </summary>
+    [HttpDelete("deezer-accounts/{id:guid}")]
+    public async Task<ActionResult> DeleteDeezerAccount(Guid id)
+    {
+        if (!IsAuthenticated())
+        {
+            return Unauthorized();
+        }
+
+        var deleted = await _deezerAccountStore.DeleteAsync(id);
+        if (!deleted)
+        {
+            return NotFound();
+        }
+
+        return Ok(new { success = true });
+    }
+
+    /// <summary>
+    /// Refresh/Re-validate account status from Deezer
+    /// </summary>
+    [HttpPost("deezer-accounts/{id:guid}/refresh")]
+    public async Task<ActionResult> RefreshDeezerAccount(Guid id)
+    {
+        if (!IsAuthenticated())
+        {
+            return Unauthorized();
+        }
+
+        var existing = await _deezerAccountStore.GetByIdAsync(id);
+        if (existing == null)
+        {
+            return NotFound();
+        }
+
+        var (success, username, userId, avatarUrl, isPremium) = await GetDeezerUserInfoAsync(existing.Arl);
+
+        if (!success)
+        {
+            await _deezerAccountStore.SetActiveStatusAsync(id, false);
+            return Ok(new { success = false, message = "ARL token validation failed. Account marked as inactive." });
+        }
+
+        existing.Username = username;
+        existing.UserId = userId;
+        existing.AvatarUrl = avatarUrl;
+        existing.IsPremium = isPremium;
+        existing.IsActive = true;
+
+        await _deezerAccountStore.UpdateAsync(id, existing);
+
+        return Ok(new
+        {
+            success = true,
+            account = new
+            {
+                existing.Id,
+                existing.Username,
+                existing.UserId,
+                existing.AvatarUrl,
+                existing.IsPremium,
+                existing.IsActive,
+                existing.RequestCount,
+                existing.LastUsedAt
+            }
+        });
+    }
+
+    #endregion
+
+    #region Deezer Auth Helper
+
+    private async Task<(bool Success, string Username, string UserId, string AvatarUrl, bool IsPremium)> GetDeezerUserInfoAsync(string arl)
+    {
+        try
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://www.deezer.com/ajax/gw-light.php?method=deezer.getUserData&input=3&api_version=1.0&api_token=");
+            request.Headers.Add("Cookie", $"arl={arl}");
+            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            
+            var response = await httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                return (false, "", "", "", false);
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            var json = JObject.Parse(responseBody);
+            
+            var results = json["results"];
+            if (results == null)
+                return (false, "", "", "", false);
+
+            var user = results["USER"];
+            if (user == null || user["USER_ID"]?.Value<long>() == 0)
+                return (false, "", "", "", false);
+
+            var username = user["BLOG_NAME"]?.ToString() ?? "Unknown";
+            var userId = user["USER_ID"]?.ToString() ?? "";
+            var userPicture = user["USER_PICTURE"]?.ToString() ?? "";
+            var offerId = user["OPTIONS"]?["offer_id"]?.Value<int>() ?? user["OPTIONS"]?["OFFER_ID"]?.Value<int>() ?? 0;
+            var licenseToken = user["OPTIONS"]?["license_token"]?.ToString() ?? "";
+
+            var avatarUrl = !string.IsNullOrEmpty(userPicture) 
+                ? $"https://e-cdns-images.dzcdn.net/images/user/{userPicture}/120x120-000000-80-0-0.jpg"
+                : "";
+
+            bool isPremium = offerId != 0 || !string.IsNullOrEmpty(licenseToken);
+
+            return (true, username, userId, avatarUrl, isPremium);
+        }
+        catch
+        {
+            return (false, "", "", "", false);
+        }
+    }
+
+    #endregion
+
     #region Helpers
 
     private bool IsAuthenticated()
@@ -580,4 +834,15 @@ public class UpdateApiKeyRequest
     public bool? IsActive { get; set; }
 }
 
+public class CreateDeezerAccountRequest
+{
+    public string Arl { get; set; } = "";
+}
+
+public class UpdateDeezerAccountRequest
+{
+    public bool? IsActive { get; set; }
+}
+
 #endregion
+

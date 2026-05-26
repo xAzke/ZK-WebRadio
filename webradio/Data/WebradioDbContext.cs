@@ -10,10 +10,16 @@ public class WebradioDbContext : DbContext
 
     public DbSet<ApiKeyEntity> ApiKeys { get; set; }
     public DbSet<TrackMetadata> TrackMetadata { get; set; }
+    public DbSet<DeezerAccountEntity> DeezerAccounts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // DeezerAccount indexes
+        modelBuilder.Entity<DeezerAccountEntity>()
+            .HasIndex(e => e.UserId)
+            .IsUnique();
 
         // ApiKey indexes
         modelBuilder.Entity<ApiKeyEntity>()

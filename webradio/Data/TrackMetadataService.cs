@@ -49,6 +49,9 @@ public class TrackMetadataService : ITrackMetadataService
                 if (!string.IsNullOrEmpty(artist)) existing.Artist = artist;
                 if (!string.IsNullOrEmpty(albumCover)) existing.AlbumCover = albumCover;
                 if (!string.IsNullOrEmpty(previewUrl)) existing.PreviewUrl = previewUrl;
+                
+                _logger.LogInformation("Track Play Updated: {TrackId} ({Title} - {Artist}). New Count: {Count}", 
+                    trackId, existing.Title, existing.Artist, existing.PlayCount);
             }
             else
             {
@@ -65,15 +68,16 @@ public class TrackMetadataService : ITrackMetadataService
                     CachedAt = DateTime.UtcNow,
                     LastPlayedAt = DateTime.UtcNow
                 });
+                
+                _logger.LogInformation("New Track Recorded: {TrackId} ({Title} - {Artist})", 
+                    trackId, title ?? "Unknown", artist ?? "Unknown");
             }
 
             await context.SaveChangesAsync();
-            _logger.LogDebug("Recorded play for track {TrackId}: {Title} by {Artist}", trackId, title, artist);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to record play for track {TrackId}", trackId);
-            // Don't throw - this is background tracking, shouldn't affect the stream
+            _logger.LogError(ex, "Database Error: Failed to record play for track {TrackId}", trackId);
         }
     }
 
@@ -92,6 +96,8 @@ public class TrackMetadataService : ITrackMetadataService
             {
                 existing.FailureCount++;
                 existing.LastPlayedAt = DateTime.UtcNow;
+                _logger.LogWarning("Track Failure Updated: {TrackId} ({Title} - {Artist}). Total Failures: {Count}", 
+                    trackId, existing.Title, existing.Artist, existing.FailureCount);
             }
             else
             {
@@ -106,14 +112,15 @@ public class TrackMetadataService : ITrackMetadataService
                     CachedAt = DateTime.UtcNow,
                     LastPlayedAt = DateTime.UtcNow
                 });
+                _logger.LogWarning("New Track Recorded (with initial failure): {TrackId} ({Title} - {Artist})", 
+                    trackId, title ?? "Unknown", artist ?? "Unknown");
             }
 
             await context.SaveChangesAsync();
-            _logger.LogWarning("Recorded failure for track {TrackId}: {Title} by {Artist}", trackId, title, artist);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to record failure for track {TrackId}", trackId);
+            _logger.LogError(ex, "Database Error: Failed to record failure for track {TrackId}", trackId);
         }
     }
 }

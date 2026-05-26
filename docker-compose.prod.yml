@@ -13,11 +13,14 @@ services:
         environment:
             - ASPNETCORE_ENVIRONMENT=Production
             - ASPNETCORE_URLS=http://+:5000
+            - DB_HOST=db.puhmoxdpjwdjtldrmblq.supabase.co
+            - DB_NAME=postgres
+            - DB_USER=postgres
+            - DB_PASS=TU_PASSWORD_AQUI
         ports:
             - "5000:5000"
         volumes:
             - deezer-cache:/tmp/deezer-cache
-            - ./data:/app/data
         networks:
             - webradio
         restart: unless-stopped
