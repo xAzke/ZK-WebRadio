@@ -6,6 +6,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.IO;
+using Microsoft.Extensions.Configuration;
 using Webradio.Data;
 
 namespace Webradio.Service;
@@ -29,11 +31,13 @@ public class StatsService : IStatsService
     private static readonly ConcurrentDictionary<string, int> _userAgentRequests = new();
     private static readonly ConcurrentDictionary<string, int> _trackRequests = new();
 
-    public StatsService(IDistributedCache cache, IDbContextFactory<WebradioDbContext>? contextFactory = null)
+    public StatsService(IDistributedCache cache, IConfiguration configuration, IDbContextFactory<WebradioDbContext>? contextFactory = null)
     {
         _cache = cache;
         _contextFactory = contextFactory;
-        _cacheDirectory = "/tmp/deezer-cache";
+        _cacheDirectory = configuration["CacheDirectory"] ?? (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+            ? Path.Combine(Path.GetTempPath(), "deezer-cache")
+            : "/tmp/deezer-cache");
     }
 
     public async Task RecordRequest(string apiKeyOwner, string ip, string action, string serviceName, string? userAgent = null, string? trackId = null)
