@@ -10,7 +10,7 @@ services:
         volumes:
             - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
 
-    webradio-deezer-service:
+    deezer:
         environment:
             - ASPNETCORE_ENVIRONMENT=Production
             - ASPNETCORE_URLS=http://+:80

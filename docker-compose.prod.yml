@@ -7,6 +7,7 @@ services:
     # Webradio API (.NET)
     webradio:
         image: ${DOCKER_REGISTRY-}webradio
+        container_name: webradio
         build:
             context: .
             dockerfile: webradio/Dockerfile
@@ -26,8 +27,9 @@ services:
         restart: unless-stopped
 
     # Deezer Service (requerido por webradio)
-    webradio-deezer-service:
+    deezer:
         image: ${DOCKER_REGISTRY-}deezerservice
+        container_name: deezer
         build:
             context: .
             dockerfile: deezer-service/Dockerfile
@@ -43,6 +45,7 @@ services:
     # Redis (para cache)
     redis:
         image: redis:alpine
+        container_name: redis
         volumes:
             - redis-data:/data
         networks:

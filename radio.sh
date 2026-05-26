@@ -190,7 +190,7 @@ cmd_help() {
     echo -e "    ${CYAN}db${NC}                    Open SQLite shell"
     echo -e "    ${CYAN}shell${NC} [service]       Open shell in container (default: webradio)"
     echo ""
-    echo -e "  ${BOLD}Services:${NC} webradio, webradio-deezer-service, redis"
+    echo -e "  ${BOLD}Services:${NC} webradio, deezer, redis"
     echo ""
     echo -e "  ${BOLD}Examples:${NC}"
     echo -e "    radio rebuild webradio      # Rebuild only the API"

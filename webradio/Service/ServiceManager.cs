@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Grpc.Net.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -22,7 +22,7 @@ public class ServiceManager : IServiceManager
         var servicesConfig = configuration.GetSection("Services");
         
         RegisterService("deezer", 
-            servicesConfig["Deezer"] ?? "http://webradio-deezer-service/");
+            servicesConfig["Deezer"] ?? "http://deezer/");
     }
 
     private void RegisterService(string serviceName, string address)

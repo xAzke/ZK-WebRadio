@@ -3,14 +3,16 @@ version: "3.4"
 services:
     webradio:
         image: ${DOCKER_REGISTRY-}webradio
+        container_name: webradio
         build:
             context: .
             dockerfile: webradio/Dockerfile
         volumes:
             - deezer-cache:/tmp/deezer-cache
 
-    webradio-deezer-service:
+    deezer:
         image: ${DOCKER_REGISTRY-}deezerservice
+        container_name: deezer
         build:
             context: .
             dockerfile: deezer-service/Dockerfile
@@ -19,6 +21,7 @@ services:
 
     redis:
         image: redis:alpine
+        container_name: redis
         volumes:
             - redis-data:/data
         restart: unless-stopped
