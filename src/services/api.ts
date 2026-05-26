@@ -10,6 +10,7 @@ export type {
     FailureTrack, 
     ApiKey, 
     ApiKeyFull, 
+    DeezerAccount,
     GeoData 
 } from "./mockData";
 
@@ -287,4 +288,87 @@ export async function geolocateIP(ip: string): Promise<mock.GeoData | null> {
         console.error(`[Geo] Failed to locate ${normalizedIP}:`, err);
         return null;
     }
+}
+
+// Deezer Accounts API
+export async function getDeezerAccounts(): Promise<mock.DeezerAccount[]> {
+    if (USE_MOCK) return mock.MOCK_DEEZER_ACCOUNTS;
+    const response = await fetchWithAuth(`${API_BASE}/deezer-accounts`);
+    if (!response.ok) throw new Error("Failed to fetch Deezer accounts");
+    return response.json();
+}
+
+export async function createDeezerAccount(data: { arl: string }): Promise<mock.DeezerAccount> {
+    if (USE_MOCK) {
+        const mockAccount: mock.DeezerAccount = {
+            id: Math.random().toString(36).substr(2, 9),
+            arl: data.arl,
+            username: "MockUser" + Math.floor(Math.random() * 100),
+            userId: Math.floor(Math.random() * 10000000).toString(),
+            avatarUrl: "",
+            isPremium: true,
+            isActive: true,
+            createdAt: new Date().toISOString(),
+            requestCount: 0
+        };
+        mock.MOCK_DEEZER_ACCOUNTS.push(mockAccount);
+        return mockAccount;
+    }
+    const response = await fetchWithAuth(`${API_BASE}/deezer-accounts`, {
+        method: "POST",
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create Deezer account");
+    }
+    return response.json();
+}
+
+export async function updateDeezerAccount(
+    id: string,
+    data: {
+        isActive?: boolean;
+    },
+): Promise<void> {
+    if (USE_MOCK) {
+        const account = mock.MOCK_DEEZER_ACCOUNTS.find(a => a.id === id);
+        if (account) {
+            if (data.isActive !== undefined) account.isActive = data.isActive;
+        }
+        return;
+    }
+    const response = await fetchWithAuth(`${API_BASE}/deezer-accounts/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error("Failed to update Deezer account");
+}
+
+export async function deleteDeezerAccount(id: string): Promise<void> {
+    if (USE_MOCK) {
+        const idx = mock.MOCK_DEEZER_ACCOUNTS.findIndex(a => a.id === id);
+        if (idx !== -1) mock.MOCK_DEEZER_ACCOUNTS.splice(idx, 1);
+        return;
+    }
+    const response = await fetchWithAuth(`${API_BASE}/deezer-accounts/${id}`, {
+        method: "DELETE",
+    });
+    if (!response.ok) throw new Error("Failed to delete Deezer account");
+}
+
+export async function refreshDeezerAccount(id: string): Promise<{ success: boolean; account?: mock.DeezerAccount; message?: string }> {
+    if (USE_MOCK) {
+        const account = mock.MOCK_DEEZER_ACCOUNTS.find(a => a.id === id);
+        if (account) {
+            account.isActive = true;
+            account.lastUsedAt = new Date().toISOString();
+        }
+        return { success: true, account };
+    }
+    const response = await fetchWithAuth(`${API_BASE}/deezer-accounts/${id}/refresh`, {
+        method: "POST",
+    });
+    if (!response.ok) throw new Error("Failed to refresh Deezer account");
+    return response.json();
 }

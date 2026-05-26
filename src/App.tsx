@@ -31,6 +31,7 @@ import { ApiKeysTable } from "@/components/ApiKeysTable";
 import { LoginForm } from "@/components/LoginForm";
 import { TrafficView } from "@/components/TrafficView";
 import { CacheBrowser } from "@/components/CacheBrowser";
+import { DeezerAccountsTable } from "@/components/DeezerAccountsTable";
 import { Button } from "@/components/ui/button";
 import { ToastProvider, useToast, ConfirmDialog } from "@/components/ui/toast";
 import { AuthError } from "@/components/AuthError";
@@ -63,10 +64,16 @@ import {
     fixUnknownTracks,
     getSettings,
     updateSettings,
+    getDeezerAccounts,
+    createDeezerAccount,
+    updateDeezerAccount,
+    deleteDeezerAccount,
+    refreshDeezerAccount,
     type Stats,
     type Track,
     type FailureTrack,
     type ApiKey,
+    type DeezerAccount,
     type RuntimeSettingsData,
 } from "@/services/api";
 import "./index.css";
@@ -122,6 +129,7 @@ const Sidebar = memo(({
                         { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
                         { id: "traffic", label: "Network Traffic", icon: Globe },
                         { id: "apikeys", label: "API Control", icon: Key },
+                        { id: "accounts", label: "Deezer Accounts", icon: Users },
                         { id: "settings", label: "Settings", icon: Sliders },
                     ].map((tab) => (
                         <button
@@ -225,7 +233,7 @@ const Sidebar = memo(({
 
 // --- Main App Logic ---
 
-type Tab = "dashboard" | "traffic" | "apikeys" | "settings";
+type Tab = "dashboard" | "traffic" | "apikeys" | "accounts" | "settings";
 
 interface ConfirmState {
     open: boolean;
@@ -270,6 +278,7 @@ function AppContent() {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [failures, setFailures] = useState<FailureTrack[]>([]);
     const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+    const [deezerAccounts, setDeezerAccounts] = useState<DeezerAccount[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [autoRefresh] = useState(false);
@@ -302,13 +311,14 @@ function AppContent() {
             if (!background) setIsLoading(true);
             setIsRefreshing(true);
             try {
-                const [statsData, tracksData, failuresData, keysData] = await Promise.all([
-                    getStats(), getTopTracks(10), getTopFailures(10), getApiKeys(),
+                const [statsData, tracksData, failuresData, keysData, accountsData] = await Promise.all([
+                    getStats(), getTopTracks(10), getTopFailures(10), getApiKeys(), getDeezerAccounts(),
                 ]);
                 setStats(statsData);
                 setTracks(tracksData);
                 setFailures(failuresData);
                 setApiKeys(keysData);
+                setDeezerAccounts(accountsData);
             } catch (error) {
                 console.error("Error fetching data:", error);
                 if (!background) {
@@ -341,6 +351,7 @@ function AppContent() {
         setStats(null);
         setTracks([]);
         setApiKeys([]);
+        setDeezerAccounts([]);
     }, []);
 
     const handleCreateApiKey = async (data: { owner: string; serverAddress: string; allowedIPAddresses?: string; }) => {
@@ -407,6 +418,69 @@ function AppContent() {
             addToast({ type: "success", title: "Key Updated" });
         } catch {
             addToast({ type: "error", title: "Update Failed" });
+        }
+    };
+
+    const handleCreateAccount = async (data: { arl: string }) => {
+        try {
+            const newAccount = await createDeezerAccount(data);
+            setDeezerAccounts((prev) => {
+                const idx = prev.findIndex(a => a.userId === newAccount.userId);
+                if (idx !== -1) {
+                    const next = [...prev];
+                    next[idx] = newAccount;
+                    return next;
+                }
+                return [...prev, newAccount];
+            });
+            addToast({ type: "success", title: "Account Connected", description: `Welcome ${newAccount.username}!` });
+        } catch (err: any) {
+            console.error(err);
+            throw new Error(err.message || "ARL token validation failed.");
+        }
+    };
+
+    const handleDeleteAccount = async (id: string) => {
+        const account = deezerAccounts.find((a) => a.id === id);
+        setConfirmState({
+            open: true, title: "Remove Deezer Account", description: `Disconnect account "${account?.username}" (${account?.userId})?`,
+            confirmText: "Disconnect", variant: "destructive",
+            onConfirm: async () => {
+                closeConfirm();
+                try {
+                    await deleteDeezerAccount(id);
+                    setDeezerAccounts((prev) => prev.filter((a) => a.id !== id));
+                    addToast({ type: "success", title: "Account Disconnected" });
+                } catch {
+                    addToast({ type: "error", title: "Action Failed" });
+                }
+            },
+        });
+    };
+
+    const handleToggleAccountActive = async (id: string, isActive: boolean) => {
+        try {
+            await updateDeezerAccount(id, { isActive });
+            setDeezerAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, isActive } : a)));
+            addToast({ type: "success", title: isActive ? "Account Enabled" : "Account Disabled" });
+        } catch {
+            addToast({ type: "error", title: "Toggle Failed" });
+        }
+    };
+
+    const handleRefreshAccount = async (id: string) => {
+        try {
+            const result = await refreshDeezerAccount(id);
+            if (result.success && result.account) {
+                const refreshed = result.account;
+                setDeezerAccounts((prev) => prev.map((a) => (a.id === id ? refreshed : a)));
+                addToast({ type: "success", title: "Account Synced", description: `${refreshed.username} metadata updated.` });
+            } else {
+                setDeezerAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, isActive: false } : a)));
+                addToast({ type: "error", title: "Validation Failed", description: result.message || "ARL token has expired." });
+            }
+        } catch {
+            addToast({ type: "error", title: "Sync Failed" });
         }
     };
 
@@ -638,6 +712,17 @@ function AppContent() {
                                     onRegenerate={handleRegenerateApiKey} 
                                     onUpdate={handleUpdateApiKey}
                                     onToggleActive={handleToggleActive} 
+                                />
+                            </BlurFade>
+                        ) : activeTab === "accounts" ? (
+                            <BlurFade delay={0.05} className="max-w-5xl mx-auto">
+                                <DeezerAccountsTable 
+                                    accounts={deezerAccounts}
+                                    isLoading={isLoading}
+                                    onCreate={handleCreateAccount}
+                                    onDelete={handleDeleteAccount}
+                                    onToggleActive={handleToggleAccountActive}
+                                    onRefresh={handleRefreshAccount}
                                 />
                             </BlurFade>
                         ) : (

@@ -73,6 +73,19 @@ export interface ApiKeyFull extends Omit<ApiKey, "keyPreview"> {
     key: string;
 }
 
+export interface DeezerAccount {
+    id: string;
+    arl: string;
+    username: string;
+    userId: string;
+    avatarUrl: string;
+    isPremium: boolean;
+    isActive: boolean;
+    createdAt: string;
+    lastUsedAt?: string;
+    requestCount: number;
+}
+
 export interface GeoData {
     status: string;
     country: string;
@@ -168,6 +181,11 @@ export const MOCK_API_KEYS: ApiKey[] = [
     { id: "1", owner: "Diego (Admin)", keyPreview: "zk_...a1b2", serverAddress: "https://radio.azke.tech", allowedIPAddresses: "*", isActive: true, createdAt: new Date(Date.now() - 1000000).toISOString(), lastUsedAt: new Date().toISOString() },
     { id: "2", owner: "Mobile Client", keyPreview: "zk_...c3d4", serverAddress: "https://api.radio.app", allowedIPAddresses: "45.78.12.34", isActive: true, createdAt: new Date(Date.now() - 5000000).toISOString(), lastUsedAt: new Date(Date.now() - 3600000).toISOString() },
     { id: "3", owner: "Testing Key", keyPreview: "zk_...e5f6", serverAddress: "http://localhost:3000", allowedIPAddresses: "127.0.0.1", isActive: false, createdAt: new Date(Date.now() - 10000000).toISOString() }
+];
+
+export const MOCK_DEEZER_ACCOUNTS: DeezerAccount[] = [
+    { id: "1", arl: "arl_mock_1", username: "DiegoPremium", userId: "394920068", avatarUrl: "https://e-cdns-images.dzcdn.net/images/user/e3952f4185610815456f91ad1b26f555/120x120-000000-80-0-0.jpg", isPremium: true, isActive: true, createdAt: new Date(Date.now() - 1000000).toISOString(), lastUsedAt: new Date().toISOString(), requestCount: 145 },
+    { id: "2", arl: "arl_mock_2", username: "GratuitoUser", userId: "924386210", avatarUrl: "", isPremium: false, isActive: false, createdAt: new Date(Date.now() - 5000000).toISOString(), lastUsedAt: new Date(Date.now() - 3600000).toISOString(), requestCount: 22 }
 ];
 
 export const MOCK_GEO: Record<string, GeoData> = {
