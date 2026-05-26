@@ -360,6 +360,7 @@ MigrationBackup/
 
 # Agent and temporary folders
 .gemini/
+.supabase/
 .antigravitycli/
 scratch/
 
