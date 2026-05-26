@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
@@ -8,6 +8,7 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Webradio.Data;
 
 namespace Webradio.Auth;
 
@@ -23,6 +24,7 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
     private static readonly Regex windowMediaRegex = WindowsMediaRegex();
 
     private readonly ApiKeyManager apiKeyManager;
+    private readonly IApiKeyStore apiKeyStore;
     private bool isEnabled = true;
     private bool logUserAgent = false;
 
@@ -31,10 +33,12 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
         ILoggerFactory logger,
         UrlEncoder encoder,
         IOptionsMonitor<ApplicationOptions> applicationOptionsMonitor,
-        ApiKeyManager apiKeyManager)
+        ApiKeyManager apiKeyManager,
+        IApiKeyStore apiKeyStore)
         : base(options, logger, encoder)
     {
         this.apiKeyManager = apiKeyManager ?? throw new ArgumentNullException(paramName: nameof(apiKeyManager));
+        this.apiKeyStore = apiKeyStore ?? throw new ArgumentNullException(paramName: nameof(apiKeyStore));
 
         isEnabled = RuntimeSettings.ResolveUserAgentAuth(applicationOptionsMonitor.CurrentValue);
         logUserAgent = RuntimeSettings.ResolveLogUserAgent(applicationOptionsMonitor.CurrentValue);
@@ -46,7 +50,7 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
         });
     }
 
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+    protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         IPAddress? ipAddress = Request.HttpContext.Connection.RemoteIpAddress;
         string? userAgent = Request.Headers.UserAgent;
@@ -71,7 +75,7 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
         if (string.IsNullOrWhiteSpace(userAgent))
         {
             Logger.LogInformation("Access for ip {IpAddress} denied - empty (path: {Path}, user-agent: {UserAgent})", ipAddress, path, userAgent);
-            return Task.FromResult(AuthenticateResult.Fail("invalid user agent"));
+            return AuthenticateResult.Fail("invalid user agent");
         }
 
         if (windowMediaRegex.Match(userAgent).Success)
@@ -88,20 +92,28 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
 
             if (apiKey != null)
             {
+                try
+                {
+                    await apiKeyStore.UpdateLastUsedAsync(apiKey.Key);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Failed to update last used timestamp for API key");
+                }
                 return Success(apiKey.Owner);
             }
             else
             {
                 Logger.LogInformation("Access for ip {IpAddress} denied - unknown server (path: {Path}, user-agent: {UserAgent})", ipAddress, path, userAgent);
-                return Task.FromResult(AuthenticateResult.Fail("invalid user agent"));
+                return AuthenticateResult.Fail("invalid user agent");
             }
         }
 
         Logger.LogInformation("Access for ip {IpAddress} denied - unmatched (path: {Path}, user-agent: {UserAgent})", ipAddress, path, userAgent);
-        return Task.FromResult(AuthenticateResult.Fail("invalid user agent"));
+        return AuthenticateResult.Fail("invalid user agent");
     }
 
-    private Task<AuthenticateResult> Success(string owerName)
+    private AuthenticateResult Success(string owerName)
     {
         var claims = new List<Claim>()
         {
@@ -110,6 +122,6 @@ public partial class UserAgentAuthenticationHandler : AuthenticationHandler<User
         var identity = new ClaimsIdentity(claims, Options.AuthenticationType);
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, Options.Scheme);
-        return Task.FromResult(AuthenticateResult.Success(ticket));
+        return AuthenticateResult.Success(ticket);
     }
 }
