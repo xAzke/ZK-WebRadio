@@ -357,3 +357,9 @@ MigrationBackup/
 # Custom ignores
 .env
 *.db
+
+# Agent and temporary folders
+.gemini/
+.antigravitycli/
+scratch/
+
