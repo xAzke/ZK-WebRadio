@@ -29,31 +29,71 @@ public sealed class Startup
     {
         services.Configure<ApplicationOptions>(configuration.GetSection("ApplicationOptions"));
         
-        // PostgreSQL Database (Supabase)
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
-        
-        if (string.IsNullOrEmpty(connectionString))
-        {
-            // Fallback to individual components (useful for Docker/Env vars)
-            var host = configuration["DB_HOST"] ?? "aws-1-us-east-2.pooler.supabase.com";
-            var db = configuration["DB_NAME"] ?? "postgres";
-            var user = configuration["DB_USER"] ?? "postgres.puhmoxdpjwdjtldrmblq";
-            var pass = configuration["DB_PASS"];
-            
-            if (!string.IsNullOrEmpty(pass))
-            {
-                // Optimization: Add pooling and timeout settings for Supabase
-                connectionString = $"Host={host};Database={db};Username={user};Password={pass};Maximum Pool Size=10;Minimum Pool Size=0;Connection Idle Lifetime=300;SSL Mode=Require;Trust Server Certificate=true";
-            }
-        }
+        // Database provider configuration (sqlite or mysql)
+        var dbProvider = configuration["DatabaseProvider"]?.Trim().ToLowerInvariant() ?? "sqlite";
 
-        if (!string.IsNullOrEmpty(connectionString))
+        if (dbProvider == "mysql")
         {
-            services.AddDbContextFactory<WebradioDbContext>(options =>
-                options.UseNpgsql(connectionString, npgsqlOptions => 
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            var dbPass = configuration["DB_PASS"];
+
+            if (!string.IsNullOrEmpty(dbPass))
+            {
+                if (!string.IsNullOrEmpty(connectionString) && connectionString.Contains("TU_PASSWORD_AQUI"))
                 {
-                    npgsqlOptions.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null);
+                    connectionString = connectionString.Replace("TU_PASSWORD_AQUI", dbPass);
+                }
+                else if (string.IsNullOrEmpty(connectionString) || connectionString.Contains("Data Source=") || connectionString.Contains("Host=aws-1-us-east-2.pooler.supabase.com"))
+                {
+                    var host = configuration["DB_HOST"] ?? "localhost";
+                    var db = configuration["DB_NAME"] ?? "webradio";
+                    var user = configuration["DB_USER"] ?? "root";
+                    var port = configuration["DB_PORT"] ?? "3306";
+                    
+                    connectionString = $"Server={host};Port={port};Database={db};Uid={user};Pwd={dbPass};";
+                }
+            }
+            
+            if (string.IsNullOrEmpty(connectionString) || connectionString.Contains("TU_PASSWORD_AQUI") || connectionString.Contains("Data Source="))
+            {
+                var host = configuration["DB_HOST"] ?? "localhost";
+                var db = configuration["DB_NAME"] ?? "webradio";
+                var user = configuration["DB_USER"] ?? "root";
+                var port = configuration["DB_PORT"] ?? "3306";
+                var pass = configuration["DB_PASS"] ?? "";
+                
+                connectionString = $"Server={host};Port={port};Database={db};Uid={user};Pwd={pass};";
+            }
+
+            ServerVersion serverVersion;
+            try
+            {
+                serverVersion = ServerVersion.AutoDetect(connectionString);
+            }
+            catch
+            {
+                // Fallback to standard MySQL version if ServerVersion.AutoDetect fails (e.g. database not running/reachable yet)
+                serverVersion = new MySqlServerVersion(new Version(8, 0, 30));
+            }
+
+            services.AddDbContextFactory<WebradioDbContext>(options =>
+                options.UseMySql(connectionString, serverVersion, mysqlOptions => 
+                {
+                    mysqlOptions.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null);
                 }));
+        }
+        else // default to sqlite
+        {
+            var connectionString = configuration.GetConnectionString("DefaultConnection");
+            
+            if (string.IsNullOrEmpty(connectionString) || connectionString.Contains("Host=") || connectionString.Contains("Server="))
+            {
+                var dbPath = configuration["DatabasePath"] ?? configuration["Database:Path"] ?? "data/webradio.db";
+                connectionString = $"Data Source={dbPath}";
+            }
+
+            services.AddDbContextFactory<WebradioDbContext>(options =>
+                options.UseSqlite(connectionString));
         }
         
         services.AddSingleton<IApiKeyStore, ApiKeyStore>();
@@ -98,15 +138,17 @@ public sealed class Startup
         });
 
         // CORS for dashboard
+        var corsOriginsStr = configuration["CorsOrigins"] ?? "http://localhost:3000,http://localhost:5173";
+        var allowedOrigins = corsOriginsStr
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(o => o.Trim())
+            .ToArray();
+
         services.AddCors(options =>
         {
             options.AddPolicy("Dashboard", policy =>
             {
-                policy.WithOrigins(
-                    "http://localhost:3000",
-                    "http://localhost:5173",
-                    configuration.GetValue<string>("Dashboard:Url") ?? "http://localhost:3000"
-                )
+                policy.WithOrigins(allowedOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -127,58 +169,12 @@ public sealed class Startup
                 var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<WebradioDbContext>>();
                 using var context = contextFactory.CreateDbContext();
                 
-                if (context.Database.CanConnect())
-                {
-                    var databaseCreator = context.Database.GetService<IDatabaseCreator>();
-                    if (databaseCreator is RelationalDatabaseCreator relationalDatabaseCreator && !relationalDatabaseCreator.HasTables())
-                    {
-                        logger.LogWarning("ATENCIÓN: La base de datos está conectada pero no tiene tablas. Recuerde ejecutar el script schema.sql manualmente en Supabase.");
-                    }
-
-                    // Ensure DeezerAccounts table exists
-                    try
-                    {
-                        using (var cmd = context.Database.GetDbConnection().CreateCommand())
-                        {
-                            cmd.CommandText = @"
-                                CREATE TABLE IF NOT EXISTS ""DeezerAccounts"" (
-                                    ""Id"" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-                                    ""Arl"" text NOT NULL,
-                                    ""Username"" varchar(150) NOT NULL,
-                                    ""UserId"" varchar(50) NOT NULL UNIQUE,
-                                    ""AvatarUrl"" varchar(500),
-                                    ""IsPremium"" boolean DEFAULT false,
-                                    ""IsActive"" boolean DEFAULT true,
-                                    ""CreatedAt"" timestamptz DEFAULT now(),
-                                    ""LastUsedAt"" timestamptz,
-                                    ""RequestCount"" integer DEFAULT 0
-                                );
-                                ALTER TABLE ""DeezerAccounts"" ENABLE ROW LEVEL SECURITY;
-                                DO $$ 
-                                BEGIN
-                                    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Permitir todo a roles de servicio' AND tablename = 'DeezerAccounts') THEN
-                                        CREATE POLICY ""Permitir todo a roles de servicio"" ON ""DeezerAccounts"" FOR ALL TO service_role USING (true) WITH CHECK (true);
-                                    END IF;
-                                END $$;
-                            ";
-                            context.Database.OpenConnection();
-                            cmd.ExecuteNonQuery();
-                        }
-                        logger.LogInformation("Tabla DeezerAccounts verificada/creada exitosamente.");
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Error al verificar o crear la tabla DeezerAccounts de forma automática.");
-                    }
-                }
-                else 
-                {
-                    logger.LogError("No se puede conectar a la base de datos de Supabase. Verifique las credenciales.");
-                }
+                context.Database.EnsureCreated();
+                logger.LogInformation("Base de datos verificada y tablas creadas/verificadas exitosamente.");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error al verificar el estado de la base de datos.");
+                logger.LogError(ex, "Error al verificar el estado de la base de datos o crear las tablas.");
             }
         }
 

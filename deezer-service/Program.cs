@@ -7,6 +7,7 @@ public sealed class Program
 {
     public static void Main(string[] args)
     {
+        EnvLoader.Load();
         CreateHostBuilder(args).Build().Run();
     }
 

@@ -8,6 +8,8 @@ public class Program
 {
     public static void Main(string[] args)
     {
+        EnvLoader.Load();
+
         // https://docs.microsoft.com/en-us/aspnet/core/grpc/troubleshoot?view=aspnetcore-3.0#call-insecure-grpc-services-with-net-core-client
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 

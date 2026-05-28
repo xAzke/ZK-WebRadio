@@ -31,7 +31,8 @@ public sealed class DeezerService : WebradioBase
         this.logger = logger;
         
         // Create cache directory for downloaded tracks
-        cacheDirectory = configuration["CacheDirectory"] ?? Path.Combine(Path.GetTempPath(), "deezer-cache");
+        var cacheDir = configuration["CacheDirectory"];
+        cacheDirectory = !string.IsNullOrWhiteSpace(cacheDir) ? cacheDir : Path.Combine(Path.GetTempPath(), "deezer-cache");
         if (!Directory.Exists(cacheDirectory))
         {
             Directory.CreateDirectory(cacheDirectory);
