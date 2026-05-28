@@ -9,6 +9,7 @@ services:
             dockerfile: webradio/Dockerfile
         volumes:
             - deezer-cache:/tmp/deezer-cache
+            - ./data:/app/data
 
     deezer:
         image: ${DOCKER_REGISTRY-}deezerservice

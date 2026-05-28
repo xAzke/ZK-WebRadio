@@ -1,4 +1,5 @@
 **/.classpath
+**/artifacts
 **/.dockerignore
 **/.env
 **/.git
