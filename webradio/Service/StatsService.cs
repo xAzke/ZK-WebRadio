@@ -35,7 +35,8 @@ public class StatsService : IStatsService
     {
         _cache = cache;
         _contextFactory = contextFactory;
-        _cacheDirectory = configuration["CacheDirectory"] ?? (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+        var cacheDir = configuration["CacheDirectory"];
+        _cacheDirectory = !string.IsNullOrWhiteSpace(cacheDir) ? cacheDir : (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
             ? Path.Combine(Path.GetTempPath(), "deezer-cache")
             : "/tmp/deezer-cache");
     }

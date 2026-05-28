@@ -24,7 +24,8 @@ public class CacheCleanupService : BackgroundService
     public CacheCleanupService(ILogger<CacheCleanupService> logger, IConfiguration configuration)
     {
         _logger = logger;
-        _cacheDirectory = configuration["CacheDirectory"] ?? Path.Combine(Path.GetTempPath(), "deezer-cache");
+        var cacheDir = configuration["CacheDirectory"];
+        _cacheDirectory = !string.IsNullOrWhiteSpace(cacheDir) ? cacheDir : Path.Combine(Path.GetTempPath(), "deezer-cache");
         
         // Configuration with defaults
         _maxFiles = configuration.GetValue<int>("CacheMaxFiles", 1000);           // Default: 1000 files

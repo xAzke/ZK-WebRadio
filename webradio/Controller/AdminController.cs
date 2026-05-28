@@ -41,7 +41,8 @@ public class AdminController : ControllerBase
         _contextFactory = contextFactory;
         _adminAuth = adminAuth;
         _httpClientFactory = httpClientFactory;
-        _cacheDirectory = configuration["CacheDirectory"] ?? (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+        var cacheDir = configuration["CacheDirectory"];
+        _cacheDirectory = !string.IsNullOrWhiteSpace(cacheDir) ? cacheDir : (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
             ? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "deezer-cache")
             : "/tmp/deezer-cache");
     }

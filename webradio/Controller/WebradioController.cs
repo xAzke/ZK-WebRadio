@@ -96,7 +96,7 @@ public class WebradioController : ControllerBase
 
     [Authorize(AuthenticationSchemes = Auth.ApiKeyAuthenticationOptions.DefaultScheme)]
     [HttpGet("{serviceName}/search")]
-    public async Task<ActionResult> Search([FromRoute] string serviceName, [FromQuery] string query)
+    public async Task<ActionResult> Search([FromRoute] string serviceName, [FromQuery] string? query)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var requestId = Guid.NewGuid().ToString()[..8];
@@ -252,7 +252,7 @@ public class WebradioController : ControllerBase
 
     [Authorize(AuthenticationSchemes = Auth.UserAgentAuthenticationOptions.DefaultScheme)]
     [HttpGet("{serviceName}/stream/{id}")]
-    public async Task<ActionResult> Stream([FromRoute] string serviceName, [FromRoute] string id)
+    public async Task<ActionResult> Stream([FromRoute] string serviceName, [FromRoute] string? id)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var requestId = Guid.NewGuid().ToString()[..8];
@@ -301,7 +301,7 @@ public class WebradioController : ControllerBase
                         filePath = "/" + filePath;
                     
                     // Retry logic for files that might be briefly locked
-                    for (int attempt = 0; attempt < 5; attempt++)
+                    for (int attempt = 0; attempt < 15; attempt++)
                     {
                         if (System.IO.File.Exists(filePath))
                         {
@@ -310,15 +310,15 @@ public class WebradioController : ControllerBase
                                 var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
                                 return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
                             }
-                            catch (System.IO.IOException) when (attempt < 4)
+                            catch (System.IO.IOException) when (attempt < 14)
                             {
-                                logger.LogDebug("Stream: File {Path} locked, retrying ({Attempt}/5)...", filePath, attempt + 1);
-                                System.Threading.Thread.Sleep(200);
+                                logger.LogDebug("Stream: File {Path} locked, retrying ({Attempt}/15)...", filePath, attempt + 1);
+                                await Task.Delay(300);
                             }
                         }
-                        else if (attempt < 4)
+                        else if (attempt < 14)
                         {
-                            System.Threading.Thread.Sleep(200);
+                            await Task.Delay(300);
                         }
                     }
                     logger.LogWarning("Stream: Cached file {Path} not found or locked after retries", filePath);
@@ -472,19 +472,25 @@ public class WebradioController : ControllerBase
                 if (!System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
                     filePath = "/" + filePath;
                 
-                for (int attempt = 0; attempt < 10; attempt++)
+                for (int attempt = 0; attempt < 15; attempt++)
                 {
                     if (System.IO.File.Exists(filePath))
                     {
                         try
                         {
-                            logger.LogDebug("Stream: Serving local file {Path} (Attempt {Attempt}/10)", filePath, attempt + 1);
+                            logger.LogDebug("Stream: Serving local file {Path} (Attempt {Attempt}/15)", filePath, attempt + 1);
                             var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
                             return File(fileStream, "audio/mpeg", enableRangeProcessing: true);
                         }
-                        catch (System.IO.IOException) when (attempt < 9) { await Task.Delay(500); }
+                        catch (System.IO.IOException) when (attempt < 14)
+                        {
+                            await Task.Delay(300);
+                        }
                     }
-                    else if (attempt < 9) { await Task.Delay(500); }
+                    else if (attempt < 14)
+                    {
+                        await Task.Delay(300);
+                    }
                 }
                 logger.LogError("Stream: Local file not found/locked after 10 retries: {Path}", filePath);
                 return NotFound();

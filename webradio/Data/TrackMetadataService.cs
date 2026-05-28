@@ -73,7 +73,32 @@ public class TrackMetadataService : ITrackMetadataService
                     trackId, title ?? "Unknown", artist ?? "Unknown");
             }
 
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Concurrency race: another thread/request inserted the track in the meantime.
+                // Detach previous tracking and try to update the existing row.
+                context.ChangeTracker.Clear();
+                
+                var retryContext = await _contextFactory.CreateDbContextAsync();
+                var dbExisting = await retryContext.TrackMetadata.FindAsync(trackId);
+                if (dbExisting != null)
+                {
+                    dbExisting.PlayCount++;
+                    dbExisting.LastPlayedAt = DateTime.UtcNow;
+                    if (!string.IsNullOrEmpty(title)) dbExisting.Title = title;
+                    if (!string.IsNullOrEmpty(artist)) dbExisting.Artist = artist;
+                    if (!string.IsNullOrEmpty(albumCover)) dbExisting.AlbumCover = albumCover;
+                    if (!string.IsNullOrEmpty(previewUrl)) dbExisting.PreviewUrl = previewUrl;
+                    
+                    await retryContext.SaveChangesAsync();
+                    _logger.LogInformation("Track Play Updated via concurrency retry: {TrackId}. New Count: {Count}", 
+                        trackId, dbExisting.PlayCount);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -116,7 +141,26 @@ public class TrackMetadataService : ITrackMetadataService
                     trackId, title ?? "Unknown", artist ?? "Unknown");
             }
 
-            await context.SaveChangesAsync();
+            try
+            {
+                await context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                // Concurrency race: another thread/request inserted the track in the meantime.
+                context.ChangeTracker.Clear();
+                
+                var retryContext = await _contextFactory.CreateDbContextAsync();
+                var dbExisting = await retryContext.TrackMetadata.FindAsync(trackId);
+                if (dbExisting != null)
+                {
+                    dbExisting.FailureCount++;
+                    dbExisting.LastPlayedAt = DateTime.UtcNow;
+                    await retryContext.SaveChangesAsync();
+                    _logger.LogWarning("Track Failure Updated via concurrency retry: {TrackId}. Total Failures: {Count}", 
+                        trackId, dbExisting.FailureCount);
+                }
+            }
         }
         catch (Exception ex)
         {
